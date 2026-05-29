@@ -1,0 +1,40 @@
+# Local env / credentials
+.env
+.env.local
+.env.*.local
+*_PRIVATE.md
+*credentials*
+
+# Build artifacts
+node_modules/
+dist/
+dist-ssr/
+build/
+.next/
+.cache/
+*.local
+
+# Test / coverage
+coverage/
+.vitest-cache/
+
+# PWA generated
+dev-dist/
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# Per-machine Claude config (launch.json etc.)
+.claude/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
