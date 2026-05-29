@@ -11,6 +11,8 @@ function makeCard(id: string, domain: Concept['domain']): SessionCard {
     lessonId: `${id}--lesson`,
     summary: '',
     wikipediaUrl: null,
+    approxYear: null,
+    eras: [],
     firstSeenAt: null,
     lastReviewedAt: null,
     createdAt: 0,
@@ -20,7 +22,7 @@ function makeCard(id: string, domain: Concept['domain']): SessionCard {
     conceptId: id,
     title: id,
     body: '',
-    recallQuestions: [{ prompt: 'q', expectedAnswer: 'a', hints: [] }],
+    recallQuestions: [{ format: 'cloze', prompt: 'q ____', expectedAnswer: 'a' }],
     sourceUrls: [],
     lastVerifiedAt: null,
     createdAt: 0,
@@ -33,7 +35,7 @@ function makeCard(id: string, domain: Concept['domain']): SessionCard {
     question: lesson.recallQuestions[0]!,
     review,
     isNew: true,
-    useMcq: false,
+    isFallback: false,
   }
 }
 

@@ -1,4 +1,12 @@
-import { db, type Concept, type Domain, type Lesson, type RecallQuestion, type Review } from '../db/schema'
+import {
+  db,
+  type Concept,
+  type Domain,
+  type Lesson,
+  type RecallQuestion,
+  type Review,
+  type SessionShape,
+} from '../db/schema'
 import { shouldShowMcqFallback } from './fsrs'
 
 export interface SessionCard {
@@ -8,13 +16,16 @@ export interface SessionCard {
   question: RecallQuestion
   review: Review
   isNew: boolean
-  useMcq: boolean
+  isFallback: boolean
 }
 
 export interface SessionPlan {
   cards: SessionCard[]
   newCount: number
   reviewCount: number
+  shape: SessionShape
+  eraId: string | null
+  domain: Domain | null
 }
 
 export const DEFAULT_NEW_PER_DOMAIN = 1
@@ -29,11 +40,6 @@ const DOMAINS: Domain[] = [
   'science',
   'modern_world',
 ]
-
-function pickFirstQuestion(lesson: Lesson | undefined): RecallQuestion | null {
-  if (!lesson) return null
-  return lesson.recallQuestions[0] ?? null
-}
 
 export function interleave(cards: SessionCard[]): SessionCard[] {
   if (cards.length <= 1) return cards
@@ -70,64 +76,12 @@ export function interleave(cards: SessionCard[]): SessionCard[] {
   return out
 }
 
-export async function buildSession(
-  now = Date.now(),
-  options: { newPerDomain?: number; maxCards?: number } = {},
-): Promise<SessionPlan> {
-  const newPerDomain = options.newPerDomain ?? DEFAULT_NEW_PER_DOMAIN
-  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
-
-  const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
-  const dueWithMeta: SessionCard[] = []
-  for (const review of dueReviews) {
-    const concept = await db.concepts.get(review.conceptId)
-    if (!concept || !concept.lessonId) continue
-    const lesson = await db.lessons.get(concept.lessonId)
-    const question = pickFirstQuestion(lesson)
-    if (!lesson || !question) continue
-    dueWithMeta.push({
-      cardKey: `review:${review.id}`,
-      concept,
-      lesson,
-      question,
-      review,
-      isNew: concept.firstSeenAt === null,
-      useMcq: shouldShowMcqFallback(review),
-    })
+function hashString(s: string): number {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0
   }
-
-  const newCards: SessionCard[] = []
-  for (const domain of DOMAINS) {
-    const candidates = await db.concepts
-      .where('domain')
-      .equals(domain)
-      .filter((c) => c.firstSeenAt === null)
-      .limit(newPerDomain)
-      .toArray()
-    for (const concept of candidates) {
-      if (!concept.lessonId) continue
-      const lesson = await db.lessons.get(concept.lessonId)
-      const question = pickFirstQuestion(lesson)
-      if (!lesson || !question) continue
-      const review = await db.reviews.where('conceptId').equals(concept.id).first()
-      if (!review) continue
-      newCards.push({
-        cardKey: `new:${concept.id}`,
-        concept,
-        lesson,
-        question,
-        review,
-        isNew: true,
-        useMcq: false,
-      })
-    }
-  }
-
-  const interleaved = interleave([...newCards, ...dueWithMeta]).slice(0, maxCards)
-  const newCount = interleaved.filter((c) => c.isNew).length
-  const reviewCount = interleaved.length - newCount
-
-  return { cards: interleaved, newCount, reviewCount }
+  return h
 }
 
 export async function buildMcqDistractors(
@@ -147,10 +101,260 @@ export async function buildMcqDistractors(
   return shuffled.slice(0, count)
 }
 
-function hashString(s: string): number {
-  let h = 5381
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) + h + s.charCodeAt(i)) | 0
+function findCloze(qs: RecallQuestion[]): RecallQuestion | undefined {
+  return qs.find((q) => q.format === 'cloze')
+}
+function findContrast(qs: RecallQuestion[]): RecallQuestion | undefined {
+  return qs.find((q) => q.format === 'contrast')
+}
+function findFree(qs: RecallQuestion[]): RecallQuestion | undefined {
+  return qs.find((q) => q.format === 'free')
+}
+
+async function pickQuestion(
+  lesson: Lesson,
+  review: Review,
+  isNew: boolean,
+  concept: Concept,
+): Promise<{ question: RecallQuestion; isFallback: boolean }> {
+  const fallback = shouldShowMcqFallback(review)
+  const qs = lesson.recallQuestions
+
+  if (fallback) {
+    const authored = findContrast(qs)
+    if (authored) return { question: authored, isFallback: true }
+    const distractors = await buildMcqDistractors(concept.id, concept.domain, 3)
+    return {
+      question: {
+        format: 'contrast',
+        prompt: 'Which of these matches the brief above?',
+        expectedAnswer: concept.name,
+        distractors,
+      },
+      isFallback: true,
+    }
   }
-  return h
+
+  if (isNew) {
+    return { question: findCloze(qs) ?? findFree(qs) ?? qs[0]!, isFallback: false }
+  }
+
+  const everyFifth = (review.reps + 1) % 5 === 0
+  if (everyFifth) {
+    const contrastQ = findContrast(qs)
+    if (contrastQ) return { question: contrastQ, isFallback: false }
+  }
+
+  return { question: findCloze(qs) ?? findContrast(qs) ?? findFree(qs) ?? qs[0]!, isFallback: false }
+}
+
+async function makeCard(
+  concept: Concept,
+  review: Review,
+  isNew: boolean,
+  cardKeyPrefix: string,
+): Promise<SessionCard | null> {
+  if (!concept.lessonId) return null
+  const lesson = await db.lessons.get(concept.lessonId)
+  if (!lesson || lesson.recallQuestions.length === 0) return null
+  const { question, isFallback } = await pickQuestion(lesson, review, isNew, concept)
+  return {
+    cardKey: `${cardKeyPrefix}:${concept.id}`,
+    concept,
+    lesson,
+    question,
+    review,
+    isNew,
+    isFallback,
+  }
+}
+
+export interface BuildOptions {
+  newPerDomain?: number
+  maxCards?: number
+  maxNew?: number
+}
+
+export async function buildEraSession(
+  eraId: string,
+  now = Date.now(),
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const newPerDomain = options.newPerDomain ?? DEFAULT_NEW_PER_DOMAIN
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+
+  const eraConcepts = await db.concepts.where('eras').equals(eraId).toArray()
+  const eraIds = new Set(eraConcepts.map((c) => c.id))
+
+  const cards: SessionCard[] = []
+
+  const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
+  for (const review of dueReviews) {
+    if (!eraIds.has(review.conceptId)) continue
+    const concept = eraConcepts.find((c) => c.id === review.conceptId)
+    if (!concept) continue
+    const isNew = concept.firstSeenAt === null
+    const card = await makeCard(concept, review, isNew, 'review')
+    if (card) cards.push(card)
+  }
+
+  const perDomain: Record<string, number> = {}
+  for (const concept of eraConcepts) {
+    if (concept.firstSeenAt !== null) continue
+    perDomain[concept.domain] = (perDomain[concept.domain] ?? 0) + 1
+    if (perDomain[concept.domain]! > newPerDomain) continue
+    if (cards.some((c) => c.concept.id === concept.id)) continue
+    const review = await db.reviews.where('conceptId').equals(concept.id).first()
+    if (!review) continue
+    const card = await makeCard(concept, review, true, 'new')
+    if (card) cards.push(card)
+  }
+
+  const interleaved = interleave(cards).slice(0, maxCards)
+  const newCount = interleaved.filter((c) => c.isNew).length
+  return {
+    cards: interleaved,
+    newCount,
+    reviewCount: interleaved.length - newCount,
+    shape: 'era',
+    eraId,
+    domain: null,
+  }
+}
+
+export async function buildDomainSession(
+  domain: Domain,
+  now = Date.now(),
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+  const maxNew = options.maxNew ?? 3
+
+  const concepts = await db.concepts.where('domain').equals(domain).toArray()
+  const cards: SessionCard[] = []
+
+  const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
+  for (const review of dueReviews) {
+    const concept = concepts.find((c) => c.id === review.conceptId)
+    if (!concept) continue
+    const isNew = concept.firstSeenAt === null
+    const card = await makeCard(concept, review, isNew, 'review')
+    if (card) cards.push(card)
+  }
+
+  let added = 0
+  const sortedByYear = [...concepts].sort(
+    (a, b) => (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity),
+  )
+  for (const concept of sortedByYear) {
+    if (added >= maxNew) break
+    if (concept.firstSeenAt !== null) continue
+    if (cards.some((c) => c.concept.id === concept.id)) continue
+    const review = await db.reviews.where('conceptId').equals(concept.id).first()
+    if (!review) continue
+    const card = await makeCard(concept, review, true, 'new')
+    if (card) {
+      cards.push(card)
+      added++
+    }
+  }
+
+  cards.sort((a, b) => (a.concept.approxYear ?? Infinity) - (b.concept.approxYear ?? Infinity))
+
+  const limited = cards.slice(0, maxCards)
+  const newCount = limited.filter((c) => c.isNew).length
+  return {
+    cards: limited,
+    newCount,
+    reviewCount: limited.length - newCount,
+    shape: 'domain',
+    eraId: null,
+    domain,
+  }
+}
+
+export async function buildSpacedSession(
+  now = Date.now(),
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+
+  const cards: SessionCard[] = []
+  const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
+  for (const review of dueReviews) {
+    const concept = await db.concepts.get(review.conceptId)
+    if (!concept) continue
+    const isNew = concept.firstSeenAt === null
+    const card = await makeCard(concept, review, isNew, 'review')
+    if (card) cards.push(card)
+  }
+  const interleaved = interleave(cards).slice(0, maxCards)
+  const newCount = interleaved.filter((c) => c.isNew).length
+  return {
+    cards: interleaved,
+    newCount,
+    reviewCount: interleaved.length - newCount,
+    shape: 'spaced',
+    eraId: null,
+    domain: null,
+  }
+}
+
+export interface EraSummary {
+  eraId: string
+  due: number
+  newAvailable: number
+  met: number
+  total: number
+}
+
+export async function summariseEras(now = Date.now()): Promise<Map<string, EraSummary>> {
+  const eras = await db.eras.toArray()
+  const summaries = new Map<string, EraSummary>()
+  for (const era of eras) {
+    summaries.set(era.id, { eraId: era.id, due: 0, newAvailable: 0, met: 0, total: 0 })
+  }
+  const concepts = await db.concepts.toArray()
+  const reviewByConcept = new Map<string, Review>()
+  for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
+  for (const concept of concepts) {
+    for (const eraId of concept.eras) {
+      const s = summaries.get(eraId)
+      if (!s) continue
+      s.total++
+      if (concept.firstSeenAt === null) s.newAvailable++
+      if (concept.firstSeenAt !== null) s.met++
+      const review = reviewByConcept.get(concept.id)
+      if (review && review.dueAt <= now) s.due++
+    }
+  }
+  return summaries
+}
+
+export interface DomainSummary {
+  domain: Domain
+  due: number
+  newAvailable: number
+  met: number
+  total: number
+}
+
+export async function summariseDomains(now = Date.now()): Promise<Map<Domain, DomainSummary>> {
+  const summaries = new Map<Domain, DomainSummary>()
+  for (const d of DOMAINS) {
+    summaries.set(d, { domain: d, due: 0, newAvailable: 0, met: 0, total: 0 })
+  }
+  const concepts = await db.concepts.toArray()
+  const reviewByConcept = new Map<string, Review>()
+  for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
+  for (const concept of concepts) {
+    const s = summaries.get(concept.domain)
+    if (!s) continue
+    s.total++
+    if (concept.firstSeenAt === null) s.newAvailable++
+    if (concept.firstSeenAt !== null) s.met++
+    const review = reviewByConcept.get(concept.id)
+    if (review && review.dueAt <= now) s.due++
+  }
+  return summaries
 }

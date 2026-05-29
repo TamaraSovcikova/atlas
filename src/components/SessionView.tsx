@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildSession, type SessionCard, type SessionPlan } from '../lib/session'
+import {
+  buildDomainSession,
+  buildEraSession,
+  buildSpacedSession,
+  type SessionCard,
+  type SessionPlan,
+} from '../lib/session'
 import { applyRating, type RecallRating } from '../lib/fsrs'
-import { db } from '../db/schema'
+import { db, type Domain, type Era } from '../db/schema'
 import { RecallCard } from './RecallCard'
+import { Constellation } from './Constellation'
 
 interface Props {
+  shape: 'era' | 'domain' | 'spaced'
+  eraId: string | null
+  domain: Domain | null
   onFinished: () => void
   onCancel: () => void
 }
@@ -14,25 +24,38 @@ interface SessionResult {
   startedAt: number
 }
 
-export function SessionView({ onFinished, onCancel }: Props) {
+export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Props) {
   const [plan, setPlan] = useState<SessionPlan | null>(null)
+  const [era, setEra] = useState<Era | null>(null)
   const [index, setIndex] = useState(0)
   const [result, setResult] = useState<SessionResult>({ ratings: [], startedAt: Date.now() })
   const [done, setDone] = useState(false)
+  const [lastRated, setLastRated] = useState<{ conceptId: string; rating: RecallRating } | null>(
+    null,
+  )
 
   useEffect(() => {
     let cancelled = false
-    buildSession().then((p) => {
+    async function load() {
+      let p: SessionPlan
+      if (shape === 'era' && eraId) {
+        p = await buildEraSession(eraId)
+        const e = await db.eras.get(eraId)
+        if (!cancelled && e) setEra(e)
+      } else if (shape === 'domain' && domain) {
+        p = await buildDomainSession(domain)
+      } else {
+        p = await buildSpacedSession()
+      }
       if (cancelled) return
       setPlan(p)
-      if (p.cards.length === 0) {
-        setDone(true)
-      }
-    })
+      if (p.cards.length === 0) setDone(true)
+    }
+    load()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [shape, eraId, domain])
 
   const current: SessionCard | null = useMemo(() => {
     if (!plan) return null
@@ -41,7 +64,7 @@ export function SessionView({ onFinished, onCancel }: Props) {
 
   const handleRated = useCallback(
     async (rating: RecallRating) => {
-      if (!current) return
+      if (!current || !plan) return
       const now = Date.now()
       const nextReview = applyRating(current.review, rating, now)
       await db.reviews.update(current.review.id!, {
@@ -64,9 +87,17 @@ export function SessionView({ onFinished, onCancel }: Props) {
         ...r,
         ratings: [...r.ratings, { conceptId: current.concept.id, rating }],
       }))
+      setLastRated({ conceptId: current.concept.id, rating })
       const nextIndex = index + 1
-      if (!plan || nextIndex >= plan.cards.length) {
-        await persistSession(result.startedAt, plan?.cards.length ?? 0, plan?.newCount ?? 0)
+      if (nextIndex >= plan.cards.length) {
+        await persistSession(
+          result.startedAt,
+          plan.cards.length,
+          plan.newCount,
+          plan.shape,
+          plan.eraId,
+          plan.domain,
+        )
         setDone(true)
       } else {
         setIndex(nextIndex)
@@ -90,7 +121,7 @@ export function SessionView({ onFinished, onCancel }: Props) {
         <h2 className="font-serif text-xl">Session complete</h2>
         <p className="mt-3 text-ink-soft">
           {plan.cards.length === 0
-            ? 'Nothing due, and no new concepts to introduce right now. Come back tomorrow; the queue will refill itself.'
+            ? 'Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.'
             : `${ratings.length} card${ratings.length === 1 ? '' : 's'} reviewed. ${
                 accuracy !== null ? `${Math.round(accuracy * 100)}% recalled.` : ''
               } The cards you missed will come back sooner.`}
@@ -112,25 +143,59 @@ export function SessionView({ onFinished, onCancel }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between text-xs text-ink-softer">
-        <span>
-          Card {index + 1} of {plan.cards.length}
-        </span>
-        <button type="button" onClick={onCancel} className="hover:text-ink">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <div className="text-ink-softer">
+          {shape === 'era' && era && <span className="text-ink-soft">{era.name}</span>}
+          {shape === 'domain' && domain && (
+            <span className="text-ink-soft capitalize">{domain.replace('_', ' ')}</span>
+          )}
+          {shape === 'spaced' && <span className="text-ink-soft">Just-due</span>}
+          <span className="ml-3 text-ink-softer">
+            Card {index + 1} of {plan.cards.length}
+          </span>
+        </div>
+        <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
           End session
         </button>
       </div>
-      <RecallCard key={current.cardKey} card={current} onRated={handleRated} />
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_220px]">
+        <div>
+          <RecallCard key={current.cardKey} card={current} onRated={handleRated} />
+          {lastRated && lastRated.conceptId !== current.concept.id && (
+            <p className="mt-4 text-xs text-ink-softer">
+              Last: {lastRated.rating === 'again' ? 'will come back soon' : 'looking good'}
+            </p>
+          )}
+        </div>
+        <aside className="lg:sticky lg:top-10 lg:self-start">
+          <Constellation
+            conceptId={current.concept.id}
+            conceptName={current.concept.name}
+            highlightId={null}
+          />
+        </aside>
+      </div>
     </div>
   )
 }
 
-async function persistSession(startedAt: number, total: number, newCount: number): Promise<void> {
+async function persistSession(
+  startedAt: number,
+  total: number,
+  newCount: number,
+  shape: SessionPlan['shape'],
+  eraId: string | null,
+  domain: Domain | null,
+): Promise<void> {
   await db.sessions.add({
     startedAt,
     durationMs: Date.now() - startedAt,
     newCount,
     reviewCount: total - newCount,
     accuracy: null,
+    shape,
+    eraId,
+    domain,
   })
 }

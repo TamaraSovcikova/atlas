@@ -49,7 +49,7 @@ npm run type-check # tsc --noEmit
 
 ## Current state (one sentence; date it)
 
-2026-05-29: Phase 1 loop shipped. 31 seeded concepts across the seven domains, interleaved session builder, typed-recall card with self-rating, MCQ soft-landing at 3+ failure streak, always-on connection panel, soft progress home view. Dogfooding gate begins now. Sync, Workers AI judging, news pipeline, and the 15-minute calibration onboarding are deferred to Phase 2+.
+2026-05-29: Phase 1.5 shipped after first-day dogfooding pivot. 11 eras seeded plus 31 concepts each tagged to one or more eras. Home view leads with three session shapes (Era Lens default, Domain Deep-Dive, Spaced Mix). Cloze deletion is the default recall format with contrast as the secondary and free-recall reserved for new concepts. A per-card Constellation replaces the connection panel. Dogfooding restarts on a meaningfully different shape. Sync, Workers AI judging, news pipeline, and 15-minute calibration onboarding remain deferred to Phase 2+.
 
 Last updated: 2026-05-29 by claude-code
 
