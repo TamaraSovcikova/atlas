@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react'
 import { DailySession } from './components/DailySession'
 import { db } from './db/schema'
+import { loadSeedIfNeeded } from './db/seed'
 
 function App() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    db.open().then(() => setReady(true))
+    let cancelled = false
+    async function init() {
+      await db.open()
+      await loadSeedIfNeeded()
+      if (!cancelled) setReady(true)
+    }
+    init()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (!ready) {

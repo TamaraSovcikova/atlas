@@ -49,7 +49,7 @@ npm run type-check # tsc --noEmit
 
 ## Current state (one sentence; date it)
 
-2026-05-29: Phase 0 bootstrap. Dexie schema and FSRS wrapper wired, empty daily-session shell renders, PWA manifest in place, no content seeded yet, sync not yet wired.
+2026-05-29: Phase 1 loop shipped. 31 seeded concepts across the seven domains, interleaved session builder, typed-recall card with self-rating, MCQ soft-landing at 3+ failure streak, always-on connection panel, soft progress home view. Dogfooding gate begins now. Sync, Workers AI judging, news pipeline, and the 15-minute calibration onboarding are deferred to Phase 2+.
 
 Last updated: 2026-05-29 by claude-code
 
