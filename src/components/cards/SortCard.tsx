@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { SortItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
+import { Button } from '../ui/Button'
 
 interface Props {
   item: SortItem
@@ -64,10 +65,10 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
               key={e.concept.id}
               type="button"
               onClick={() => setSelected(e.concept.id)}
-              className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
+              className={`rounded-full border px-4 py-2 text-sm transition-all active:scale-95 ${
                 selected === e.concept.id
-                  ? 'border-accent bg-accent/15 text-ink'
-                  : 'border-bg-softer/40 bg-bg-soft text-ink hover:border-accent/50'
+                  ? 'border-accent bg-accent/15 text-ink shadow-glow'
+                  : 'border-white/10 bg-bg-raised text-ink hover:border-accent/50'
               }`}
             >
               {e.concept.name}
@@ -88,7 +89,7 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 selected && !revealed
                   ? 'border-accent/50 bg-accent/5 hover:border-accent'
-                  : 'border-bg-softer/40 bg-bg-soft/60'
+                  : 'border-white/10 bg-bg-soft/60'
               } disabled:cursor-default`}
             >
               <p className="text-sm font-medium text-ink">{bucket.label}</p>
@@ -103,16 +104,15 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
                         ok
                           ? 'bg-accent/15 text-accent'
                           : bad
-                            ? 'bg-red-500/10 text-red-300'
-                            : 'bg-bg-softer/40 text-ink-soft'
+                            ? 'bg-bad/10 text-bad'
+                            : 'bg-bg-raised text-ink-soft'
                       }`}
                     >
                       {e.concept.name}
                       {bad && (
                         <span className="text-ink-softer">
                           {' '}
-                          - belongs in{' '}
-                          {item.buckets.find((b) => b.id === e.bucketId)?.label}
+                          - belongs in {item.buckets.find((b) => b.id === e.bucketId)?.label}
                         </span>
                       )}
                     </li>
@@ -125,7 +125,7 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
       </div>
 
       {!revealed && selected && (
-        <p className="text-xs text-ink-softer">Now tap the group it belongs to.</p>
+        <p className="text-xs text-accent">Now tap the group it belongs to.</p>
       )}
 
       {revealed && (
@@ -135,8 +135,7 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
               ? 'All sorted correctly.'
               : `${correctCount} of ${entries.length} right.`}
           </p>
-          <button
-            type="button"
+          <Button
             onClick={() =>
               onDone(
                 entries.map((e) => ({
@@ -145,10 +144,9 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
                 })),
               )
             }
-            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
     </article>

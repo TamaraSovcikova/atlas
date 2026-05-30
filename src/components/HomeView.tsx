@@ -7,6 +7,7 @@ import {
   type DomainSummary,
   type EraSummary,
 } from '../lib/session'
+import { Button } from './ui/Button'
 
 const DOMAIN_LABEL: Record<Domain, string> = {
   history: 'History',
@@ -24,11 +25,12 @@ interface Props {
   onStartEra: (eraId: string) => void
   onStartDomain: (domain: Domain) => void
   onStartSpaced: () => void
+  onOpenConstellation: () => void
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-export function HomeView({ onStartEra, onStartDomain, onStartSpaced }: Props) {
+export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConstellation }: Props) {
   const [shape, setShape] = useState<Shape>('era')
 
   const eras = useLiveQuery(() => db.eras.orderBy('displayOrder').toArray(), [], [] as Era[])
@@ -94,7 +96,7 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced }: Props) {
                   type="button"
                   disabled={empty}
                   onClick={() => onStartEra(era.id)}
-                  className="group w-full rounded-2xl border border-bg-softer/40 bg-bg-soft/60 p-5 text-left transition-colors hover:border-accent/60 hover:bg-accent/5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-bg-softer/40 disabled:hover:bg-bg-soft/60"
+                  className="surface group w-full p-5 text-left transition-all hover:border-accent/50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="font-serif text-lg text-ink">{era.name}</h3>
@@ -131,7 +133,7 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced }: Props) {
                   type="button"
                   disabled={empty}
                   onClick={() => onStartDomain(domain)}
-                  className="w-full rounded-2xl border border-bg-softer/40 bg-bg-soft/60 p-4 text-left transition-colors hover:border-accent/60 hover:bg-accent/5 disabled:opacity-40"
+                  className="surface w-full p-4 text-left transition-all hover:border-accent/50 active:scale-[0.99] disabled:opacity-40"
                 >
                   <h3 className="font-serif text-base text-ink">{DOMAIN_LABEL[domain]}</h3>
                   <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-ink-softer">
@@ -147,22 +149,39 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced }: Props) {
       )}
 
       {shape === 'spaced' && (
-        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/60 p-6">
+        <div className="surface p-6">
           <h3 className="font-serif text-lg text-ink">Just the reviews</h3>
           <p className="mt-2 text-sm text-ink-soft">
             Whatever the spaced-repetition scheduler thinks is due, in one interleaved pass. No new
             material. Use this when you are behind and want to keep what you already have.
           </p>
-          <button
-            type="button"
-            onClick={onStartSpaced}
-            disabled={(dueNow ?? 0) === 0}
-            className="mt-5 rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft disabled:opacity-40"
-          >
+          <Button onClick={onStartSpaced} disabled={(dueNow ?? 0) === 0} className="mt-5">
             {(dueNow ?? 0) > 0 ? `Start ${dueNow} due` : 'Nothing due right now'}
-          </button>
+          </Button>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={onOpenConstellation}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-bg-soft/60 px-5 py-4 text-left transition-colors hover:border-cool/50"
+      >
+        <span>
+          <span className="block font-serif text-base text-ink">Explore your constellation</span>
+          <span className="block text-xs text-ink-softer">
+            {learnedCount ?? 0} of {conceptCount ?? 0} stars lit. See how it all connects.
+          </span>
+        </span>
+        <span className="text-cool">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="2.2" />
+            <circle cx="5" cy="6" r="1.4" />
+            <circle cx="19" cy="7" r="1.4" />
+            <circle cx="18" cy="17" r="1.4" />
+            <path d="M12 12 5 6M12 12l7-5M12 12l6 5" opacity="0.5" />
+          </svg>
+        </span>
+      </button>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="In your graph" value={conceptCount ?? 0} />
@@ -194,10 +213,10 @@ function ShapeTab({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border px-3 py-3 text-center transition-colors ${
+      className={`rounded-2xl border px-3 py-3 text-center transition-all active:scale-[0.98] ${
         active
-          ? 'border-accent/70 bg-accent/10'
-          : 'border-bg-softer/40 bg-bg-soft/40 hover:border-accent/40'
+          ? 'border-accent/70 bg-accent/10 shadow-glow'
+          : 'border-white/10 bg-bg-soft/40 hover:border-accent/40'
       }`}
     >
       <span className={`block text-sm font-medium ${active ? 'text-accent' : 'text-ink'}`}>

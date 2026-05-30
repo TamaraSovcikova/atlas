@@ -12,7 +12,9 @@ import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
 import { OrderCard } from './cards/OrderCard'
 import { SortCard } from './cards/SortCard'
-import { Constellation } from './Constellation'
+import { ConstellationBanner } from './ConstellationBanner'
+import { Button } from './ui/Button'
+import { M, AnimatePresence, cardVariants, ease } from './ui/motion'
 
 interface Props {
   shape: 'era' | 'domain' | 'spaced'
@@ -25,6 +27,12 @@ interface Props {
 function primaryConceptId(item: SessionItem): string {
   if (item.kind === 'recall') return item.concept.id
   return item.entries[0]!.concept.id
+}
+
+function primaryConceptName(item: SessionItem): string {
+  if (item.kind === 'recall') return item.concept.name
+  if (item.kind === 'order') return 'Timeline'
+  return 'Sort'
 }
 
 async function recordRating(conceptId: string, rating: RecallRating, now: number) {
@@ -61,8 +69,8 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
   const [ratings, setRatings] = useState<RecallRating[]>([])
   const [done, setDone] = useState(false)
   const [activeConcept, setActiveConcept] = useState<string | null>(null)
+  const [activeName, setActiveName] = useState<string>('')
   const [pulseKey, setPulseKey] = useState(0)
-  const [showExplore, setShowExplore] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -80,7 +88,10 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
       if (cancelled) return
       setPlan(p)
       if (p.items.length === 0) setDone(true)
-      else setActiveConcept(primaryConceptId(p.items[0]!))
+      else {
+        setActiveConcept(primaryConceptId(p.items[0]!))
+        setActiveName(primaryConceptName(p.items[0]!))
+      }
     }
     load()
     return () => {
@@ -123,6 +134,7 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
       } else {
         setIndex(nextIndex)
         setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
+        setActiveName(primaryConceptName(plan.items[nextIndex]!))
         setPulseKey(0)
       }
     },
@@ -139,8 +151,14 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
         ? null
         : ratings.filter((r) => r !== 'again').length / ratings.length
     return (
-      <section className="rounded-2xl border border-bg-softer/40 bg-bg-soft p-8">
-        <h2 className="font-serif text-xl">Session complete</h2>
+      <M.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={ease}
+        className="surface p-8"
+      >
+        <div className="text-3xl">{accuracy !== null && accuracy >= 0.8 ? '🌟' : '✨'}</div>
+        <h2 className="mt-2 font-serif text-2xl">Session complete</h2>
         <p className="mt-3 text-ink-soft">
           {plan.items.length === 0
             ? 'Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.'
@@ -148,52 +166,31 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
                 accuracy !== null ? `${Math.round(accuracy * 100)}% recalled.` : ''
               } The ones you missed will come back sooner.`}
         </p>
-        <button
-          type="button"
-          onClick={onFinished}
-          className="mt-6 rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
-        >
+        <Button onClick={onFinished} className="mt-6">
           Back to home
-        </button>
-      </section>
+        </Button>
+      </M.section>
     )
   }
 
   if (!current) return <p className="text-ink-softer">Session ended.</p>
 
-  if (showExplore) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-serif text-lg">Your constellation</h2>
-          <button
-            type="button"
-            onClick={() => setShowExplore(false)}
-            className="text-sm text-ink-softer hover:text-ink"
-          >
-            Back to session
-          </button>
-        </div>
-        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/40">
-          <Constellation conceptId={activeConcept} pulseKey={0} mode="explore" height={460} />
-        </div>
-        <p className="text-xs text-ink-softer">
-          Bright stars are concepts you have met. Dim ones are waiting. Pinch or scroll to explore.
-        </p>
-      </div>
-    )
-  }
+  const progress = (index + (pulseKey > 0 ? 1 : 0)) / plan.items.length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {prefs.showConstellationReveal && (
+        <ConstellationBanner conceptId={activeConcept} conceptName={activeName} pulseKey={pulseKey} />
+      )}
+
       <div className="flex items-center justify-between gap-3 text-xs">
         <div className="text-ink-softer">
           {shape === 'era' && era && <span className="text-ink-soft">{era.name}</span>}
           {shape === 'domain' && domain && (
             <span className="text-ink-soft capitalize">{domain.replace('_', ' ')}</span>
           )}
-          {shape === 'spaced' && <span className="text-ink-soft">Just-due</span>}
-          <span className="ml-3 text-ink-softer">
+          {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
+          <span className="ml-3">
             {index + 1} of {plan.items.length}
           </span>
         </div>
@@ -202,35 +199,35 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
         </button>
       </div>
 
-      <div>
-        {current.kind === 'recall' && (
-          <RecallCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
-        )}
-        {current.kind === 'order' && (
-          <OrderCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
-        )}
-        {current.kind === 'sort' && (
-          <SortCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
-        )}
+      <div className="h-1 overflow-hidden rounded-full bg-bg-softer">
+        <M.div
+          className="h-full rounded-full bg-accent-grad"
+          animate={{ width: `${Math.round(progress * 100)}%` }}
+          transition={ease}
+        />
       </div>
 
-      {prefs.showConstellationReveal && (
-        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/30 p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-[11px] uppercase tracking-wider text-ink-softer">
-              {pulseKey > 0 ? 'Connections lighting up' : 'How this connects'}
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowExplore(true)}
-              className="text-[11px] text-ink-softer underline decoration-ink-softer/40 hover:text-ink"
-            >
-              explore
-            </button>
-          </div>
-          <Constellation conceptId={activeConcept} pulseKey={pulseKey} mode="focus" height={220} />
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        <M.div
+          key={current.cardKey}
+          variants={cardVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={ease}
+          className="surface p-6"
+        >
+          {current.kind === 'recall' && (
+            <RecallCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+          )}
+          {current.kind === 'order' && (
+            <OrderCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+          )}
+          {current.kind === 'sort' && (
+            <SortCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+          )}
+        </M.div>
+      </AnimatePresence>
     </div>
   )
 }

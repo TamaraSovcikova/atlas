@@ -1,11 +1,13 @@
 import { HomeView } from './HomeView'
 import { SessionView } from './SessionView'
 import { SettingsView } from './SettingsView'
+import { ConstellationScreen } from './ConstellationScreen'
 import type { Domain } from '../db/schema'
 
 type Mode =
   | { kind: 'home' }
   | { kind: 'settings' }
+  | { kind: 'constellation' }
   | { kind: 'session'; shape: 'era'; eraId: string }
   | { kind: 'session'; shape: 'domain'; domain: Domain }
   | { kind: 'session'; shape: 'spaced' }
@@ -18,6 +20,10 @@ interface Props {
 export function DailySession({ mode, setMode }: Props) {
   if (mode.kind === 'settings') {
     return <SettingsView onClose={() => setMode({ kind: 'home' })} />
+  }
+
+  if (mode.kind === 'constellation') {
+    return <ConstellationScreen onClose={() => setMode({ kind: 'home' })} />
   }
 
   if (mode.kind === 'session') {
@@ -37,6 +43,7 @@ export function DailySession({ mode, setMode }: Props) {
       onStartEra={(eraId) => setMode({ kind: 'session', shape: 'era', eraId })}
       onStartDomain={(domain) => setMode({ kind: 'session', shape: 'domain', domain })}
       onStartSpaced={() => setMode({ kind: 'session', shape: 'spaced' })}
+      onOpenConstellation={() => setMode({ kind: 'constellation' })}
     />
   )
 }

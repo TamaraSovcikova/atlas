@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { connectionsFor } from '../lib/connections'
-import { db, type Concept } from '../db/schema'
+import { db, type Concept, type Domain } from '../db/schema'
 
 interface GraphNode {
   id: string
   name: string
+  domain: Domain
   known: boolean
   isCenter: boolean
+  x?: number
+  y?: number
 }
 interface GraphLink {
   source: string
@@ -19,6 +22,19 @@ interface Props {
   pulseKey: number
   mode?: 'focus' | 'explore'
   height?: number
+}
+
+const ARM_COUNT = 6
+
+// Domain-keyed accent tints so the map reads as a themed star-field.
+const DOMAIN_HUE: Record<Domain, string> = {
+  history: '#fbbf24',
+  geography: '#6ea8fe',
+  politics: '#f472b6',
+  religions: '#a78bfa',
+  culture: '#fb923c',
+  science: '#4ade80',
+  modern_world: '#22d3ee',
 }
 
 export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 240 }: Props) {
@@ -33,9 +49,7 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.clientWidth, h: height })
-    })
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: height }))
     ro.observe(el)
     setSize({ w: el.clientWidth, h: height })
     return () => ro.disconnect()
@@ -51,6 +65,7 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
         const nodes: GraphNode[] = concepts.map((c: Concept) => ({
           id: c.id,
           name: c.name,
+          domain: c.domain,
           known: c.lastReviewedAt !== null,
           isCenter: c.id === conceptId,
         }))
@@ -73,12 +88,13 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
       }
       const center = await db.concepts.get(conceptId)
       if (!center) return
-      const hits = await connectionsFor(conceptId, 6)
+      const hits = await connectionsFor(conceptId, ARM_COUNT)
       const nodes: GraphNode[] = [
-        { id: center.id, name: center.name, known: true, isCenter: true },
+        { id: center.id, name: center.name, domain: center.domain, known: true, isCenter: true },
         ...hits.map((h) => ({
           id: h.concept.id,
           name: h.concept.name,
+          domain: h.concept.domain,
           known: h.isKnown,
           isCenter: false,
         })),
@@ -92,7 +108,7 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
     }
   }, [conceptId, mode])
 
-  // Particle burst on answer.
+  // Particle burst + gentle reheat when an answer lands.
   useEffect(() => {
     if (pulseKey === 0 || !fgRef.current) return
     const fg = fgRef.current
@@ -100,15 +116,12 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
       for (const link of data.links) fg.emitParticle(link)
       fg.d3ReheatSimulation?.()
     } catch {
-      // ignore if graph not ready
+      /* graph not ready */
     }
   }, [pulseKey])
 
   const nodeColor = useMemo(
-    () => (n: GraphNode) => {
-      if (n.isCenter) return '#fbbf24'
-      return n.known ? '#fcd34d' : '#475569'
-    },
+    () => (n: GraphNode) => (n.known ? DOMAIN_HUE[n.domain] : '#3b4763'),
     [],
   )
 
@@ -123,45 +136,76 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
           backgroundColor="rgba(0,0,0,0)"
           nodeId="id"
           nodeRelSize={5}
-          nodeVal={(n: GraphNode) => (n.isCenter ? 6 : n.known ? 3 : 1.5)}
           nodeColor={nodeColor as any}
           nodeLabel={(n: GraphNode) => n.name}
-          linkColor={() => 'rgba(251, 191, 36, 0.25)'}
-          linkWidth={(l: any) => (typeof l === 'object' ? 1 : 1)}
+          linkColor={() => 'rgba(148, 163, 184, 0.18)'}
+          linkWidth={() => 1}
           linkDirectionalParticleWidth={2.5}
-          linkDirectionalParticleColor={() => '#fbbf24'}
-          nodeCanvasObjectMode={() => 'after'}
+          linkDirectionalParticleSpeed={0.012}
+          linkDirectionalParticleColor={(l: any) => {
+            const tgt = typeof l.target === 'object' ? l.target : null
+            return tgt && tgt.known ? DOMAIN_HUE[tgt.domain as Domain] : '#fbbf24'
+          }}
+          nodeCanvasObjectMode={() => 'replace'}
           nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, scale: number) => {
             const n = node as GraphNode & { x: number; y: number }
-            if (n.isCenter) {
+            const base = n.isCenter ? 7 : n.known ? 4.5 : 3
+            const hue = n.known || n.isCenter ? DOMAIN_HUE[n.domain] : '#3b4763'
+
+            // Outer glow halo (only for lit nodes, keeps dim ones quiet).
+            if (n.known || n.isCenter) {
+              const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, base * 3.2)
+              grad.addColorStop(0, hexA(hue, n.isCenter ? 0.55 : 0.32))
+              grad.addColorStop(1, hexA(hue, 0))
+              ctx.fillStyle = grad
               ctx.beginPath()
-              ctx.arc(n.x, n.y, 9, 0, 2 * Math.PI)
-              ctx.fillStyle = 'rgba(251,191,36,0.18)'
+              ctx.arc(n.x, n.y, base * 3.2, 0, 2 * Math.PI)
               ctx.fill()
             }
-            if (mode === 'explore' || n.isCenter) {
-              const label = n.name
-              const fontSize = Math.max(10 / scale, 2.5)
-              ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`
+
+            // Core dot.
+            ctx.beginPath()
+            ctx.arc(n.x, n.y, base, 0, 2 * Math.PI)
+            ctx.fillStyle = hue
+            ctx.fill()
+            if (n.isCenter) {
+              ctx.lineWidth = 1.4 / scale
+              ctx.strokeStyle = '#fff7e6'
+              ctx.stroke()
+            }
+
+            // Labels: always for center; in explore for everything; else only known.
+            if (mode === 'explore' || n.isCenter || n.known) {
+              const fontSize = Math.max((n.isCenter ? 11 : 9) / scale, 2.4)
+              ctx.font = `${n.isCenter ? '600 ' : ''}${fontSize}px ui-sans-serif, system-ui, sans-serif`
               ctx.textAlign = 'center'
               ctx.textBaseline = 'top'
-              ctx.fillStyle = n.known ? '#cbd5e1' : '#64748b'
-              ctx.fillText(label, n.x, n.y + 8)
+              ctx.fillStyle = n.isCenter ? '#f6f8fc' : n.known ? '#c2cce0' : '#5b677e'
+              ctx.fillText(n.name, n.x, n.y + base + 2)
             }
           }}
-          cooldownTicks={mode === 'explore' ? 120 : 60}
-          warmupTicks={mode === 'explore' ? 40 : 20}
+          cooldownTicks={mode === 'explore' ? 140 : 60}
+          warmupTicks={mode === 'explore' ? 40 : 18}
           enableZoomInteraction={mode === 'explore'}
           enablePanInteraction={mode === 'explore'}
+          enableNodeDrag={mode === 'explore'}
           onEngineStop={() => {
             try {
-              fgRef.current?.zoomToFit(300, mode === 'explore' ? 30 : 20)
+              fgRef.current?.zoomToFit(400, mode === 'explore' ? 36 : 26)
             } catch {
-              // ignore
+              /* ignore */
             }
           }}
         />
       )}
     </div>
   )
+}
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
