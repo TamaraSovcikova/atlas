@@ -191,12 +191,19 @@ function findByFormat(qs: RecallQuestion[], fmt: RecallQuestion['format']): Reca
   return qs.find((q) => q.format === fmt)
 }
 
+/**
+ * Pick the format for a card. Variety is driven by the card's POSITION in the
+ * session (rotationIndex), not by review maturity, so a brand-new user still
+ * sees a mix of chips, contrast, and map from the very first session. The mix
+ * is deterministic per session so it does not reshuffle on re-render.
+ */
 async function chooseQuestion(
   policy: Policy,
   isNew: boolean,
   review: Review,
   lesson: Lesson,
   concept: Concept,
+  rotationIndex: number,
 ): Promise<{ question: RecallQuestion; isFallback: boolean }> {
   const qs = lesson.recallQuestions
   const clozeQ = findByFormat(qs, 'cloze') ?? qs[0]!
@@ -218,15 +225,33 @@ async function chooseQuestion(
     }
   }
 
+  // A brand-new concept always opens with its brief. In serious mode that means
+  // typed free-recall. Otherwise alternate chips and contrast (both show the
+  // brief) so even an all-new first session is not wall-to-wall fill-in-blank.
   if (isNew) {
     if (policy.newConceptFormat === 'free' && freeQ) {
       return { question: freeQ, isFallback: false }
     }
+    if (policy.contrast && contrastQ && rotationIndex % 2 === 1) {
+      return { question: contrastQ, isFallback: false }
+    }
     return { question: await toClozeChips(clozeQ, concept, policy), isFallback: false }
   }
 
-  // Map drill for geographic concepts, periodically.
-  if (policy.games.map && concept.lat !== null && concept.lng !== null && review.reps % 4 === 2) {
+  // For review cards, rotate through the available formats by session position.
+  // Build the menu of what THIS concept can offer, then pick by index so the
+  // session as a whole is varied even when every card is freshly seen.
+  const canMap = policy.games.map && concept.lat !== null && concept.lng !== null
+  const canContrast = policy.contrast && !!contrastQ
+  const menu: Array<'chips' | 'contrast' | 'map'> = ['chips']
+  if (canContrast) menu.push('contrast')
+  if (canMap) menu.push('map')
+
+  const choice = menu[rotationIndex % menu.length]!
+  if (choice === 'contrast' && contrastQ) {
+    return { question: contrastQ, isFallback: false }
+  }
+  if (choice === 'map') {
     return {
       question: {
         format: 'map',
@@ -236,12 +261,6 @@ async function chooseQuestion(
       isFallback: false,
     }
   }
-
-  // Discriminative contrast every fifth review when one is authored.
-  if (policy.contrast && contrastQ && (review.reps + 1) % 5 === 0) {
-    return { question: contrastQ, isFallback: false }
-  }
-
   return { question: await toClozeChips(clozeQ, concept, policy), isFallback: false }
 }
 
@@ -263,11 +282,19 @@ async function makeRecallItem(
   isNew: boolean,
   policy: Policy,
   prefix: string,
+  rotationIndex: number,
 ): Promise<RecallItem | null> {
   if (!concept.lessonId) return null
   const lesson = await db.lessons.get(concept.lessonId)
   if (!lesson || lesson.recallQuestions.length === 0) return null
-  const { question, isFallback } = await chooseQuestion(policy, isNew, review, lesson, concept)
+  const { question, isFallback } = await chooseQuestion(
+    policy,
+    isNew,
+    review,
+    lesson,
+    concept,
+    rotationIndex,
+  )
   return {
     kind: 'recall',
     cardKey: `${prefix}:${concept.id}`,
@@ -282,12 +309,15 @@ async function makeRecallItem(
 
 function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
   let items: SessionItem[] = interleave(recall)
-  const reviewItems = recall.filter((r) => !r.isNew)
+  // Games draw from the whole session pool, new concepts included. Order and
+  // sort cards reveal the correct answer with feedback, so they teach even a
+  // first-seen concept, and this guarantees variety from session one.
+  const poolItems = recall
 
   if (policy.games.order) {
     const seenYears = new Set<number>()
     const datable: RecallItem[] = []
-    for (const r of reviewItems) {
+    for (const r of poolItems) {
       if (r.concept.approxYear === null) continue
       if (seenYears.has(r.concept.approxYear)) continue
       seenYears.add(r.concept.approxYear)
@@ -308,7 +338,7 @@ function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
 
   if (policy.games.sort) {
     const remaining = items.filter(
-      (it): it is RecallItem => it.kind === 'recall' && !it.isNew,
+      (it): it is RecallItem => it.kind === 'recall',
     )
     const byDomain = new Map<Domain, RecallItem[]>()
     for (const r of remaining) {
@@ -383,12 +413,14 @@ export async function buildEraSession(
   const eraIds = new Set(eraConcepts.map((c) => c.id))
   const recall: RecallItem[] = []
 
+  let rot = 0
   const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
   for (const review of dueReviews) {
     if (!eraIds.has(review.conceptId)) continue
     const concept = eraConcepts.find((c) => c.id === review.conceptId)
     if (!concept) continue
-    const item = await makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'review')
+    const isNew = concept.firstSeenAt === null
+    const item = await makeRecallItem(concept, review, isNew, policy, 'review', rot++)
     if (item) recall.push(item)
   }
 
@@ -400,7 +432,7 @@ export async function buildEraSession(
     if (recall.some((c) => c.concept.id === concept.id)) continue
     const review = await db.reviews.where('conceptId').equals(concept.id).first()
     if (!review) continue
-    const item = await makeRecallItem(concept, review, true, policy, 'new')
+    const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
     if (item) recall.push(item)
   }
 
@@ -422,11 +454,12 @@ export async function buildDomainSession(
   const concepts = await db.concepts.where('domain').equals(domain).toArray()
   const recall: RecallItem[] = []
 
+  let rot = 0
   const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
   for (const review of dueReviews) {
     const concept = concepts.find((c) => c.id === review.conceptId)
     if (!concept) continue
-    const item = await makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'review')
+    const item = await makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'review', rot++)
     if (item) recall.push(item)
   }
 
@@ -440,7 +473,7 @@ export async function buildDomainSession(
     if (recall.some((c) => c.concept.id === concept.id)) continue
     const review = await db.reviews.where('conceptId').equals(concept.id).first()
     if (!review) continue
-    const item = await makeRecallItem(concept, review, true, policy, 'new')
+    const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
     if (item) {
       recall.push(item)
       added++
@@ -463,11 +496,13 @@ export async function buildSpacedSession(
   const policy = resolvePolicy(prefs)
   const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
   const recall: RecallItem[] = []
+  let rot = 0
   const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
   for (const review of dueReviews) {
     const concept = await db.concepts.get(review.conceptId)
     if (!concept) continue
-    const item = await makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'review')
+    const isNew = concept.firstSeenAt === null
+    const item = await makeRecallItem(concept, review, isNew, policy, 'review', rot++)
     if (item) recall.push(item)
   }
   const limited = recall.slice(0, maxCards)
