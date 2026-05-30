@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { interleave, type SessionCard } from './session'
+import { interleave, type RecallItem } from './session'
 import type { Concept, Lesson, Review } from '../db/schema'
 import { newReview } from './fsrs'
 
-function makeCard(id: string, domain: Concept['domain']): SessionCard {
+function makeCard(id: string, domain: Concept['domain']): RecallItem {
   const concept: Concept = {
     id,
     name: id,
@@ -13,6 +13,8 @@ function makeCard(id: string, domain: Concept['domain']): SessionCard {
     wikipediaUrl: null,
     approxYear: null,
     eras: [],
+    lat: null,
+    lng: null,
     firstSeenAt: null,
     lastReviewedAt: null,
     createdAt: 0,
@@ -29,6 +31,7 @@ function makeCard(id: string, domain: Concept['domain']): SessionCard {
   }
   const review: Review = { ...newReview(id, 0), id: 1 }
   return {
+    kind: 'recall',
     cardKey: id,
     concept,
     lesson,

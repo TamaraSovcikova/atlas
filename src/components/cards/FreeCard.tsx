@@ -1,37 +1,44 @@
 import { useEffect, useState } from 'react'
-import type { SessionCard } from '../../lib/session'
+import type { RecallItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
 import { Brief } from '../Brief'
 import { RatingRow } from '../RatingRow'
 
 interface Props {
-  card: SessionCard
-  onRated: (rating: RecallRating) => void
+  item: RecallItem
+  onAnswered: (conceptId: string) => void
+  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
 }
 
-export function FreeCard({ card, onRated }: Props) {
+export function FreeCard({ item, onAnswered, onDone }: Props) {
+  const { concept, question } = item
   const [typed, setTyped] = useState('')
   const [revealed, setRevealed] = useState(false)
 
   useEffect(() => {
     setTyped('')
     setRevealed(false)
-  }, [card.cardKey])
+  }, [item.cardKey])
+
+  function reveal() {
+    setRevealed(true)
+    onAnswered(concept.id)
+  }
 
   return (
     <article className="space-y-6">
       <header className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] uppercase tracking-wider text-ink-softer">
-          {card.concept.domain.replace('_', ' ')}
+          {concept.domain.replace('_', ' ')}
         </p>
-        {card.isNew && (
+        {item.isNew && (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
             new
           </span>
         )}
       </header>
-      {card.isNew && <Brief concept={card.concept} variant="intro" />}
-      <p className="text-lg leading-relaxed text-ink">{card.question.prompt}</p>
+      {item.isNew && <Brief concept={concept} variant="intro" />}
+      <p className="text-lg leading-relaxed text-ink">{question.prompt}</p>
       <textarea
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
@@ -44,7 +51,7 @@ export function FreeCard({ card, onRated }: Props) {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => setRevealed(true)}
+            onClick={reveal}
             className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
           >
             Reveal
@@ -55,9 +62,9 @@ export function FreeCard({ card, onRated }: Props) {
         <>
           <section className="rounded-xl border border-accent/30 bg-accent/5 p-4">
             <p className="text-[11px] uppercase tracking-wider text-accent">Answer</p>
-            <p className="mt-2 text-ink">{card.question.expectedAnswer}</p>
+            <p className="mt-2 text-ink">{question.expectedAnswer}</p>
           </section>
-          <RatingRow onRate={onRated} />
+          <RatingRow onRate={(rating) => onDone([{ conceptId: concept.id, rating }])} />
         </>
       )}
     </article>

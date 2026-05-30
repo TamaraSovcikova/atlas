@@ -1,16 +1,24 @@
-import { useState } from 'react'
 import { HomeView } from './HomeView'
 import { SessionView } from './SessionView'
+import { SettingsView } from './SettingsView'
 import type { Domain } from '../db/schema'
 
 type Mode =
   | { kind: 'home' }
+  | { kind: 'settings' }
   | { kind: 'session'; shape: 'era'; eraId: string }
   | { kind: 'session'; shape: 'domain'; domain: Domain }
   | { kind: 'session'; shape: 'spaced' }
 
-export function DailySession() {
-  const [mode, setMode] = useState<Mode>({ kind: 'home' })
+interface Props {
+  mode: Mode
+  setMode: (m: Mode) => void
+}
+
+export function DailySession({ mode, setMode }: Props) {
+  if (mode.kind === 'settings') {
+    return <SettingsView onClose={() => setMode({ kind: 'home' })} />
+  }
 
   if (mode.kind === 'session') {
     return (
@@ -32,3 +40,5 @@ export function DailySession() {
     />
   )
 }
+
+export type { Mode }

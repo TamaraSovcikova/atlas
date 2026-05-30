@@ -3,12 +3,15 @@ import {
   buildDomainSession,
   buildEraSession,
   buildSpacedSession,
-  type SessionCard,
+  type SessionItem,
   type SessionPlan,
 } from '../lib/session'
 import { applyRating, type RecallRating } from '../lib/fsrs'
 import { db, type Domain, type Era } from '../db/schema'
+import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
+import { OrderCard } from './cards/OrderCard'
+import { SortCard } from './cards/SortCard'
 import { Constellation } from './Constellation'
 
 interface Props {
@@ -19,112 +22,131 @@ interface Props {
   onCancel: () => void
 }
 
-interface SessionResult {
-  ratings: { conceptId: string; rating: RecallRating }[]
-  startedAt: number
+function primaryConceptId(item: SessionItem): string {
+  if (item.kind === 'recall') return item.concept.id
+  return item.entries[0]!.concept.id
+}
+
+async function recordRating(conceptId: string, rating: RecallRating, now: number) {
+  const review = await db.reviews.where('conceptId').equals(conceptId).first()
+  if (!review) return
+  const next = applyRating(review, rating, now)
+  await db.reviews.update(review.id!, {
+    dueAt: next.dueAt,
+    stability: next.stability,
+    difficulty: next.difficulty,
+    elapsedDays: next.elapsedDays,
+    scheduledDays: next.scheduledDays,
+    reps: next.reps,
+    lapses: next.lapses,
+    state: next.state,
+    lastReviewedAt: next.lastReviewedAt,
+    failureStreak: next.failureStreak,
+  })
+  const concept = await db.concepts.get(conceptId)
+  if (concept) {
+    await db.concepts.update(conceptId, {
+      lastReviewedAt: now,
+      firstSeenAt: concept.firstSeenAt ?? now,
+    })
+  }
 }
 
 export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Props) {
+  const prefs = useSettings((s) => s.prefs)
   const [plan, setPlan] = useState<SessionPlan | null>(null)
   const [era, setEra] = useState<Era | null>(null)
   const [index, setIndex] = useState(0)
-  const [result, setResult] = useState<SessionResult>({ ratings: [], startedAt: Date.now() })
+  const [startedAt] = useState(() => Date.now())
+  const [ratings, setRatings] = useState<RecallRating[]>([])
   const [done, setDone] = useState(false)
-  const [lastRated, setLastRated] = useState<{ conceptId: string; rating: RecallRating } | null>(
-    null,
-  )
+  const [activeConcept, setActiveConcept] = useState<string | null>(null)
+  const [pulseKey, setPulseKey] = useState(0)
+  const [showExplore, setShowExplore] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       let p: SessionPlan
       if (shape === 'era' && eraId) {
-        p = await buildEraSession(eraId)
+        p = await buildEraSession(eraId, prefs)
         const e = await db.eras.get(eraId)
         if (!cancelled && e) setEra(e)
       } else if (shape === 'domain' && domain) {
-        p = await buildDomainSession(domain)
+        p = await buildDomainSession(domain, prefs)
       } else {
-        p = await buildSpacedSession()
+        p = await buildSpacedSession(prefs)
       }
       if (cancelled) return
       setPlan(p)
-      if (p.cards.length === 0) setDone(true)
+      if (p.items.length === 0) setDone(true)
+      else setActiveConcept(primaryConceptId(p.items[0]!))
     }
     load()
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape, eraId, domain])
 
-  const current: SessionCard | null = useMemo(() => {
+  const current: SessionItem | null = useMemo(() => {
     if (!plan) return null
-    return plan.cards[index] ?? null
+    return plan.items[index] ?? null
   }, [plan, index])
 
-  const handleRated = useCallback(
-    async (rating: RecallRating) => {
-      if (!current || !plan) return
+  const handleAnswered = useCallback((conceptId: string) => {
+    setActiveConcept(conceptId)
+    setPulseKey((k) => k + 1)
+  }, [])
+
+  const handleDone = useCallback(
+    async (results: { conceptId: string; rating: RecallRating }[]) => {
+      if (!plan) return
       const now = Date.now()
-      const nextReview = applyRating(current.review, rating, now)
-      await db.reviews.update(current.review.id!, {
-        dueAt: nextReview.dueAt,
-        stability: nextReview.stability,
-        difficulty: nextReview.difficulty,
-        elapsedDays: nextReview.elapsedDays,
-        scheduledDays: nextReview.scheduledDays,
-        reps: nextReview.reps,
-        lapses: nextReview.lapses,
-        state: nextReview.state,
-        lastReviewedAt: nextReview.lastReviewedAt,
-        failureStreak: nextReview.failureStreak,
-      })
-      await db.concepts.update(current.concept.id, {
-        lastReviewedAt: now,
-        firstSeenAt: current.concept.firstSeenAt ?? now,
-      })
-      setResult((r) => ({
-        ...r,
-        ratings: [...r.ratings, { conceptId: current.concept.id, rating }],
-      }))
-      setLastRated({ conceptId: current.concept.id, rating })
+      for (const r of results) {
+        await recordRating(r.conceptId, r.rating, now)
+      }
+      setRatings((prev) => [...prev, ...results.map((r) => r.rating)])
       const nextIndex = index + 1
-      if (nextIndex >= plan.cards.length) {
-        await persistSession(
-          result.startedAt,
-          plan.cards.length,
-          plan.newCount,
-          plan.shape,
-          plan.eraId,
-          plan.domain,
-        )
+      if (nextIndex >= plan.items.length) {
+        await db.sessions.add({
+          startedAt,
+          durationMs: now - startedAt,
+          newCount: plan.newCount,
+          reviewCount: plan.reviewCount,
+          accuracy: null,
+          shape: plan.shape,
+          eraId: plan.eraId,
+          domain: plan.domain,
+        })
         setDone(true)
       } else {
         setIndex(nextIndex)
+        setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
+        setPulseKey(0)
       }
     },
-    [current, index, plan, result.startedAt],
+    [plan, index, startedAt],
   )
 
   if (!plan) {
     return <p className="text-ink-softer">Building today's session...</p>
   }
 
-  if (done || plan.cards.length === 0) {
-    const ratings = result.ratings
+  if (done || plan.items.length === 0) {
     const accuracy =
       ratings.length === 0
         ? null
-        : ratings.filter((r) => r.rating !== 'again').length / ratings.length
+        : ratings.filter((r) => r !== 'again').length / ratings.length
     return (
       <section className="rounded-2xl border border-bg-softer/40 bg-bg-soft p-8">
         <h2 className="font-serif text-xl">Session complete</h2>
         <p className="mt-3 text-ink-soft">
-          {plan.cards.length === 0
+          {plan.items.length === 0
             ? 'Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.'
-            : `${ratings.length} card${ratings.length === 1 ? '' : 's'} reviewed. ${
+            : `${ratings.length} answer${ratings.length === 1 ? '' : 's'}. ${
                 accuracy !== null ? `${Math.round(accuracy * 100)}% recalled.` : ''
-              } The cards you missed will come back sooner.`}
+              } The ones you missed will come back sooner.`}
         </p>
         <button
           type="button"
@@ -137,8 +159,29 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
     )
   }
 
-  if (!current) {
-    return <p className="text-ink-softer">Session ended.</p>
+  if (!current) return <p className="text-ink-softer">Session ended.</p>
+
+  if (showExplore) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg">Your constellation</h2>
+          <button
+            type="button"
+            onClick={() => setShowExplore(false)}
+            className="text-sm text-ink-softer hover:text-ink"
+          >
+            Back to session
+          </button>
+        </div>
+        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/40">
+          <Constellation conceptId={activeConcept} pulseKey={0} mode="explore" height={460} />
+        </div>
+        <p className="text-xs text-ink-softer">
+          Bright stars are concepts you have met. Dim ones are waiting. Pinch or scroll to explore.
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -151,7 +194,7 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
           )}
           {shape === 'spaced' && <span className="text-ink-soft">Just-due</span>}
           <span className="ml-3 text-ink-softer">
-            Card {index + 1} of {plan.cards.length}
+            {index + 1} of {plan.items.length}
           </span>
         </div>
         <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
@@ -159,43 +202,35 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_220px]">
-        <div>
-          <RecallCard key={current.cardKey} card={current} onRated={handleRated} />
-          {lastRated && lastRated.conceptId !== current.concept.id && (
-            <p className="mt-4 text-xs text-ink-softer">
-              Last: {lastRated.rating === 'again' ? 'will come back soon' : 'looking good'}
-            </p>
-          )}
-        </div>
-        <aside className="lg:sticky lg:top-10 lg:self-start">
-          <Constellation
-            conceptId={current.concept.id}
-            conceptName={current.concept.name}
-            highlightId={null}
-          />
-        </aside>
+      <div>
+        {current.kind === 'recall' && (
+          <RecallCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
+        )}
+        {current.kind === 'order' && (
+          <OrderCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
+        )}
+        {current.kind === 'sort' && (
+          <SortCard key={current.cardKey} item={current} onAnswered={handleAnswered} onDone={handleDone} />
+        )}
       </div>
+
+      {prefs.showConstellationReveal && (
+        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/30 p-4">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-[11px] uppercase tracking-wider text-ink-softer">
+              {pulseKey > 0 ? 'Connections lighting up' : 'How this connects'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowExplore(true)}
+              className="text-[11px] text-ink-softer underline decoration-ink-softer/40 hover:text-ink"
+            >
+              explore
+            </button>
+          </div>
+          <Constellation conceptId={activeConcept} pulseKey={pulseKey} mode="focus" height={220} />
+        </div>
+      )}
     </div>
   )
-}
-
-async function persistSession(
-  startedAt: number,
-  total: number,
-  newCount: number,
-  shape: SessionPlan['shape'],
-  eraId: string | null,
-  domain: Domain | null,
-): Promise<void> {
-  await db.sessions.add({
-    startedAt,
-    durationMs: Date.now() - startedAt,
-    newCount,
-    reviewCount: total - newCount,
-    accuracy: null,
-    shape,
-    eraId,
-    domain,
-  })
 }

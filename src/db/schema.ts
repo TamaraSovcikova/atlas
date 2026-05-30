@@ -22,7 +22,7 @@ export type RelationType =
 
 export type Region = 'uk' | 'slovak_eu' | 'world'
 
-export type RecallFormat = 'cloze' | 'contrast' | 'free'
+export type RecallFormat = 'cloze' | 'cloze_chips' | 'contrast' | 'free' | 'map'
 
 export type SessionShape = 'era' | 'domain' | 'spaced'
 
@@ -44,6 +44,8 @@ export interface Concept {
   wikipediaUrl: string | null
   approxYear: number | null
   eras: string[]
+  lat: number | null
+  lng: number | null
   firstSeenAt: number | null
   lastReviewedAt: number | null
   createdAt: number
@@ -65,6 +67,7 @@ export interface RecallQuestion {
   prompt: string
   expectedAnswer: string
   distractors?: string[]
+  chipDistractors?: string[]
   hint?: string | null
 }
 

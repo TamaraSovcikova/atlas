@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { SessionCard } from '../../lib/session'
+import type { RecallItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
 import { Brief } from '../Brief'
-import { RatingRow } from '../RatingRow'
 
 interface Props {
-  card: SessionCard
-  onRated: (rating: RecallRating) => void
+  item: RecallItem
+  onAnswered: (conceptId: string) => void
+  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -18,36 +18,45 @@ function shuffle<T>(arr: T[]): T[] {
   return out
 }
 
-export function ContrastCard({ card, onRated }: Props) {
-  const correct = card.question.expectedAnswer
-  const distractors = card.question.distractors ?? []
-  const options = useMemo(() => shuffle([correct, ...distractors]), [card.cardKey, correct, distractors])
+export function ContrastCard({ item, onAnswered, onDone }: Props) {
+  const { concept, question } = item
+  const correct = question.expectedAnswer
+  const distractors = question.distractors ?? []
+  const options = useMemo(
+    () => shuffle([correct, ...distractors]),
+    [item.cardKey, correct, distractors],
+  )
   const [picked, setPicked] = useState<string | null>(null)
 
-  useEffect(() => {
-    setPicked(null)
-  }, [card.cardKey])
+  useEffect(() => setPicked(null), [item.cardKey])
 
-  const showBrief = card.isFallback || card.isNew
+  const showBrief = item.isFallback || item.isNew
+  const gotIt = picked === correct
+
+  function pick(opt: string) {
+    if (picked !== null) return
+    setPicked(opt)
+    onAnswered(concept.id)
+  }
 
   return (
     <article className="space-y-6">
       <header className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] uppercase tracking-wider text-ink-softer">
-          {card.concept.domain.replace('_', ' ')}
+          {concept.domain.replace('_', ' ')}
         </p>
-        {card.isFallback ? (
+        {item.isFallback ? (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
             pick
           </span>
-        ) : card.isNew ? (
+        ) : item.isNew ? (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
             new
           </span>
         ) : null}
       </header>
-      {showBrief && <Brief concept={card.concept} variant="intro" />}
-      <p className="text-lg text-ink">{card.question.prompt}</p>
+      {showBrief && <Brief concept={concept} variant="intro" />}
+      <p className="text-lg text-ink">{question.prompt}</p>
       <ul className="space-y-2">
         {options.map((opt) => {
           const isCorrect = opt === correct
@@ -64,7 +73,7 @@ export function ContrastCard({ card, onRated }: Props) {
             <li key={opt}>
               <button
                 type="button"
-                onClick={() => setPicked(opt)}
+                onClick={() => pick(opt)}
                 disabled={picked !== null}
                 className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${tone}`}
               >
@@ -75,15 +84,19 @@ export function ContrastCard({ card, onRated }: Props) {
         })}
       </ul>
       {picked !== null && (
-        <>
+        <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-ink-soft">
-            {picked === correct
-              ? 'Yes. The right answer was '
-              : 'Not yet. The right answer was '}
+            {gotIt ? 'Yes. ' : 'Not yet. '}
             <span className="text-accent">{correct}</span>.
           </p>
-          <RatingRow onRate={onRated} />
-        </>
+          <button
+            type="button"
+            onClick={() => onDone([{ conceptId: concept.id, rating: gotIt ? 'good' : 'again' }])}
+            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
+          >
+            Next
+          </button>
+        </div>
       )}
     </article>
   )

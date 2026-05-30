@@ -8,6 +8,8 @@ interface SeedConcept {
   domain: Domain
   approxYear: number | null
   eras: string[]
+  lat?: number
+  lng?: number
   summary: string
   wikipediaUrl: string
   questions: RecallQuestion[]
@@ -231,6 +233,8 @@ const SEED: SeedConcept[] = [
     domain: 'geography',
     approxYear: 1707,
     eras: ['enlightenment', 'long19c'],
+    lat: 54.0,
+    lng: -2.5,
     summary:
       "The UK is a union of four countries: England, Scotland, Wales, and Northern Ireland. England is the largest by population (about 56 million of the UK's 67 million). The political union dates to the 1707 Act of Union (England and Scotland) and 1801 (Ireland, most of which left in 1922). Each country has some devolved powers; Scotland, Wales, and Northern Ireland have their own parliaments or assemblies handling areas like health and education, while Westminster handles foreign policy, defence, and tax.",
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Countries_of_the_United_Kingdom',
@@ -252,6 +256,8 @@ const SEED: SeedConcept[] = [
     domain: 'geography',
     approxYear: 1993,
     eras: ['postcoldwar'],
+    lat: 48.7,
+    lng: 19.7,
     summary:
       'Slovakia is a landlocked Central European country bordering five others: Czech Republic (northwest), Poland (north), Ukraine (east), Hungary (south), and Austria (southwest). It became independent in 1993 after splitting peacefully from the Czech Republic. Capital: Bratislava, on the Danube, unusually close to the Austrian border. Slovakia joined the EU and NATO in 2004 and adopted the euro in 2009. Population about 5.4 million.',
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Slovakia',
@@ -270,6 +276,8 @@ const SEED: SeedConcept[] = [
     domain: 'geography',
     approxYear: 1993,
     eras: ['postcoldwar', 'multipolar'],
+    lat: 50.0,
+    lng: 10.0,
     summary:
       'As of 2026 the European Union has 27 member states, down from 28 after the UK left in 2020 (Brexit). The largest by population: Germany, France, Italy, Spain, Poland. Membership in the EU is not the same as membership in the eurozone (20 countries use the euro) or the Schengen Area (most but not all EU members plus a few non-members like Switzerland). The eastward expansion in 2004 brought in ten countries at once, including Slovakia, Poland, the Baltics, and others.',
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Member_state_of_the_European_Union',
@@ -287,6 +295,8 @@ const SEED: SeedConcept[] = [
     domain: 'geography',
     approxYear: 1953,
     eras: ['coldwar'],
+    lat: 38.0,
+    lng: 127.5,
     summary:
       "A peninsula in East Asia divided since 1948 into North Korea (DPRK, capital Pyongyang) and South Korea (ROK, capital Seoul). The split followed Japanese surrender in 1945 when the US and USSR agreed to divide the peninsula along the 38th parallel as a temporary administrative line. The Korean War (1950-53) made the division permanent, ending in armistice rather than peace treaty. The Demilitarised Zone (DMZ) between them is one of the most militarised borders in the world. North Korea has nuclear weapons; South Korea is one of the world's largest economies.",
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Korea',
@@ -312,6 +322,8 @@ const SEED: SeedConcept[] = [
     domain: 'geography',
     approxYear: 2020,
     eras: ['multipolar'],
+    lat: 15.0,
+    lng: 0.0,
     summary:
       'A semi-arid band stretching across Africa just south of the Sahara, roughly 1,000 km wide, from Senegal in the west to Sudan in the east. Countries along it include Mali, Burkina Faso, Niger, Chad, and parts of Mauritania, Senegal, Nigeria, and Sudan. The region faces three compounding crises: climate change (desertification pushing south), jihadist insurgencies (especially in Mali, Burkina, Niger), and political instability (a string of coups since 2020). It is also a major source region for migration toward Europe.',
     wikipediaUrl: 'https://en.wikipedia.org/wiki/Sahel',
@@ -729,7 +741,7 @@ const SEED: SeedConcept[] = [
   },
 ]
 
-const SEED_FLAG_KEY = 'seed:v2:loaded'
+const SEED_FLAG_KEY = 'seed:v3:loaded'
 
 export async function loadSeedIfNeeded(): Promise<void> {
   const flag = await db.settings.get(SEED_FLAG_KEY)
@@ -748,6 +760,9 @@ export async function loadSeedIfNeeded(): Promise<void> {
       for (const seed of SEED) {
         const lessonId = `${seed.id}--lesson`
 
+        // Preserve any existing progress on re-seed (flag bumps re-run this loader).
+        const existing = await db.concepts.get(seed.id)
+
         const concept: Concept = {
           id: seed.id,
           name: seed.name,
@@ -757,9 +772,11 @@ export async function loadSeedIfNeeded(): Promise<void> {
           wikipediaUrl: seed.wikipediaUrl,
           approxYear: seed.approxYear,
           eras: seed.eras,
-          firstSeenAt: null,
-          lastReviewedAt: null,
-          createdAt: now,
+          lat: seed.lat ?? null,
+          lng: seed.lng ?? null,
+          firstSeenAt: existing?.firstSeenAt ?? null,
+          lastReviewedAt: existing?.lastReviewedAt ?? null,
+          createdAt: existing?.createdAt ?? now,
         }
         await db.concepts.put(concept)
 
