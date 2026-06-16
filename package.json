@@ -18,7 +18,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name atlas --branch main --commit-dirty=true"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

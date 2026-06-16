@@ -45,7 +45,16 @@ npm install
 npm run dev        # Vite dev server
 npm test           # Vitest unit tests
 npm run type-check # tsc --noEmit
+npm run deploy     # build + wrangler pages deploy to Cloudflare Pages
 ```
+
+## Live deployment
+
+Cloudflare Pages project `atlas`, live at **https://atlas-6uj.pages.dev/** (wrangler
+OAuth as tamara.sovcik@gmail.com). `npm run deploy` builds and pushes. Installable as a
+PWA (Add to Home Screen). Local-first: progress is per-device, not yet synced across
+devices (sync is Phase 2). Dev server in WSL: `node` is via nvm, so a plain `npm run dev`
+from a non-login shell fails -- source `~/.nvm/nvm.sh` first.
 
 ## Current state (one sentence; date it)
 
