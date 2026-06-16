@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BANK_CONCEPTS, BANK_ERAS, validateBank } from './index'
+import { BANK_CONCEPTS, BANK_ERAS, BANK_THREADS, validateBank } from './index'
 
 describe('content bank integrity', () => {
   it('has no structural issues (edges resolve, eras valid, questions well-formed)', () => {
@@ -20,5 +20,22 @@ describe('content bank integrity', () => {
 
   it('has a healthy concept count', () => {
     expect(BANK_CONCEPTS.length).toBeGreaterThanOrEqual(70)
+  })
+
+  it('every thread member resolves to a real concept', () => {
+    const ids = new Set(BANK_CONCEPTS.map((c) => c.id))
+    for (const t of BANK_THREADS) {
+      expect(t.members.length, `thread "${t.id}" is empty`).toBeGreaterThan(0)
+      for (const m of t.members) {
+        expect(ids.has(m.concept), `thread "${t.id}" -> unknown concept "${m.concept}"`).toBe(true)
+      }
+    }
+  })
+
+  it('every thread has at least one tier-1 anchor (a skeleton)', () => {
+    for (const t of BANK_THREADS) {
+      const anchors = t.members.filter((m) => (m.tier ?? 1) === 1)
+      expect(anchors.length, `thread "${t.id}" has no tier-1 anchors`).toBeGreaterThan(0)
+    }
   })
 })

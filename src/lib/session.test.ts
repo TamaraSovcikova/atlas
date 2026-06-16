@@ -13,6 +13,7 @@ function makeCard(id: string, domain: Concept['domain']): RecallItem {
     wikipediaUrl: null,
     approxYear: null,
     eras: [],
+    threads: [],
     lat: null,
     lng: null,
     firstSeenAt: null,

@@ -3,6 +3,7 @@ import {
   buildDomainSession,
   buildEraSession,
   buildSpacedSession,
+  buildThreadSession,
   type SessionItem,
   type SessionPlan,
 } from '../lib/session'
@@ -17,9 +18,10 @@ import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, ease } from './ui/motion'
 
 interface Props {
-  shape: 'era' | 'domain' | 'spaced'
+  shape: 'era' | 'domain' | 'spaced' | 'thread'
   eraId: string | null
   domain: Domain | null
+  threadId: string | null
   onFinished: () => void
   onCancel: () => void
 }
@@ -55,10 +57,11 @@ async function recordRating(conceptId: string, rating: RecallRating, now: number
   }
 }
 
-export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Props) {
+export function SessionView({ shape, eraId, domain, threadId, onFinished, onCancel }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [plan, setPlan] = useState<SessionPlan | null>(null)
   const [era, setEra] = useState<Era | null>(null)
+  const [threadName, setThreadName] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
   const [startedAt] = useState(() => Date.now())
   const [ratings, setRatings] = useState<RecallRating[]>([])
@@ -76,6 +79,10 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
         if (!cancelled && e) setEra(e)
       } else if (shape === 'domain' && domain) {
         p = await buildDomainSession(domain, prefs)
+      } else if (shape === 'thread' && threadId) {
+        p = await buildThreadSession(threadId, prefs)
+        const t = await db.threads.get(threadId)
+        if (!cancelled && t) setThreadName(t.name)
       } else {
         p = await buildSpacedSession(prefs)
       }
@@ -91,7 +98,7 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shape, eraId, domain])
+  }, [shape, eraId, domain, threadId])
 
   const current: SessionItem | null = useMemo(() => {
     if (!plan) return null
@@ -122,6 +129,7 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
           shape: plan.shape,
           eraId: plan.eraId,
           domain: plan.domain,
+          threadId: plan.threadId,
         })
         setDone(true)
       } else {
@@ -181,6 +189,9 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
           {shape === 'era' && era && <span className="text-ink-soft">{era.name}</span>}
           {shape === 'domain' && domain && (
             <span className="text-ink-soft capitalize">{domain.replace('_', ' ')}</span>
+          )}
+          {shape === 'thread' && threadName && (
+            <span className="text-ink-soft">{threadName}</span>
           )}
           {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
           <span className="ml-3">

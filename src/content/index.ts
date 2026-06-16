@@ -1,5 +1,6 @@
-import type { BankConcept, BankEra } from './types'
+import type { BankConcept, BankEra, BankThread } from './types'
 import { ERAS } from './eras'
+import { THREADS } from './threads'
 import { ANCIENT } from './bank/ancient'
 import { EARLY_MODERN } from './bank/earlyModern'
 import { INDUSTRIAL } from './bank/industrial'
@@ -9,7 +10,7 @@ import { CONTEMPORARY } from './bank/contemporary'
  * Bump when the bank content changes so the loader re-syncs it into Dexie.
  * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
  */
-export const BANK_VERSION = 'v4'
+export const BANK_VERSION = 'v5'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,
@@ -19,6 +20,8 @@ export const BANK_CONCEPTS: BankConcept[] = [
 ]
 
 export const BANK_ERAS: BankEra[] = ERAS
+
+export const BANK_THREADS: BankThread[] = THREADS
 
 export interface BankIssue {
   conceptId: string
@@ -62,6 +65,24 @@ export function validateBank(): BankIssue[] {
       if (!ids.has(e.to)) {
         issues.push({ conceptId: c.id, problem: `edge to unknown concept "${e.to}"` })
       }
+    }
+  }
+
+  // Threads: ids unique, members resolve to real concepts, no dup members.
+  const threadIds = new Set<string>()
+  for (const t of BANK_THREADS) {
+    if (threadIds.has(t.id)) issues.push({ conceptId: t.id, problem: 'duplicate thread id' })
+    threadIds.add(t.id)
+    if (t.members.length === 0) issues.push({ conceptId: t.id, problem: 'thread has no members' })
+    const seenMembers = new Set<string>()
+    for (const m of t.members) {
+      if (!ids.has(m.concept)) {
+        issues.push({ conceptId: t.id, problem: `thread member unknown concept "${m.concept}"` })
+      }
+      if (seenMembers.has(m.concept)) {
+        issues.push({ conceptId: t.id, problem: `duplicate thread member "${m.concept}"` })
+      }
+      seenMembers.add(m.concept)
     }
   }
 

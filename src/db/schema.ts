@@ -24,7 +24,7 @@ export type Region = 'uk' | 'slovak_eu' | 'world'
 
 export type RecallFormat = 'cloze' | 'cloze_chips' | 'contrast' | 'free' | 'map'
 
-export type SessionShape = 'era' | 'domain' | 'spaced'
+export type SessionShape = 'era' | 'domain' | 'spaced' | 'thread'
 
 export interface Era {
   id: string
@@ -33,6 +33,26 @@ export interface Era {
   endYear: number
   description: string
   displayOrder: number
+}
+
+export interface ThreadMember {
+  conceptId: string
+  /** 1 = anchor (skeleton), 2 = supporting event/figure, 3 = detail/story. */
+  tier: number
+}
+
+/**
+ * A narrative storyline: an ordered, tiered reading-list over concepts, cutting
+ * vertically through eras (e.g. "20th-century Europe"). Members are authored in
+ * narrative order; the session walks them chronologically and introduces lower
+ * tiers first, so a thread teaches its skeleton before its detail.
+ */
+export interface Thread {
+  id: string
+  name: string
+  description: string
+  displayOrder: number
+  members: ThreadMember[]
 }
 
 export interface Concept {
@@ -44,6 +64,7 @@ export interface Concept {
   wikipediaUrl: string | null
   approxYear: number | null
   eras: string[]
+  threads: string[]
   lat: number | null
   lng: number | null
   firstSeenAt: number | null
@@ -108,6 +129,7 @@ export interface Session {
   shape: SessionShape | null
   eraId: string | null
   domain: Domain | null
+  threadId?: string | null
 }
 
 export interface NewsItem {
@@ -136,6 +158,7 @@ export class AtlasDB extends Dexie {
   news!: Table<NewsItem, string>
   settings!: Table<SettingsKv, string>
   eras!: Table<Era, string>
+  threads!: Table<Thread, string>
 
   constructor() {
     super('atlas')
@@ -166,6 +189,20 @@ export class AtlasDB extends Dexie {
         await tx.table('lessons').clear()
         await tx.table('reviews').clear()
       })
+    // v3 adds threads (narrative storylines) and a multiEntry index on
+    // concepts.threads. Re-seed (drop the bank flag) so memberships populate;
+    // FSRS reviews and firstSeenAt on concepts are preserved.
+    this.version(3).stores({
+      concepts: 'id, name, domain, approxYear, lastReviewedAt, *eras, *threads',
+      edges: '++id, fromId, toId, [fromId+toId], isPersonal',
+      lessons: 'id, conceptId',
+      reviews: '++id, conceptId, dueAt, state',
+      sessions: '++id, startedAt',
+      news: 'id, date, region',
+      settings: 'key',
+      eras: 'id, displayOrder',
+      threads: 'id, displayOrder',
+    })
   }
 }
 

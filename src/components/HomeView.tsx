@@ -4,8 +4,10 @@ import { db, type Domain, type Era } from '../db/schema'
 import {
   summariseDomains,
   summariseEras,
+  summariseThreads,
   type DomainSummary,
   type EraSummary,
+  type ThreadSummary,
 } from '../lib/session'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
@@ -20,19 +22,26 @@ const DOMAIN_LABEL: Record<Domain, string> = {
   modern_world: 'Modern world spine',
 }
 
-type Shape = 'era' | 'domain' | 'spaced'
+type Shape = 'thread' | 'era' | 'domain' | 'spaced'
 
 interface Props {
   onStartEra: (eraId: string) => void
   onStartDomain: (domain: Domain) => void
+  onStartThread: (threadId: string) => void
   onStartSpaced: () => void
   onOpenConstellation: () => void
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConstellation }: Props) {
-  const [shape, setShape] = useState<Shape>('era')
+export function HomeView({
+  onStartEra,
+  onStartDomain,
+  onStartThread,
+  onStartSpaced,
+  onOpenConstellation,
+}: Props) {
+  const [shape, setShape] = useState<Shape>('thread')
 
   const eras = useLiveQuery(() => db.eras.orderBy('displayOrder').toArray(), [], [] as Era[])
   const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
@@ -58,10 +67,12 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
 
   const [eraSummaries, setEraSummaries] = useState<Map<string, EraSummary>>(new Map())
   const [domainSummaries, setDomainSummaries] = useState<Map<Domain, DomainSummary>>(new Map())
+  const [threadSummaries, setThreadSummaries] = useState<ThreadSummary[]>([])
 
   useEffect(() => {
     summariseEras().then(setEraSummaries)
     summariseDomains().then(setDomainSummaries)
+    summariseThreads().then(setThreadSummaries)
   }, [conceptCount, learnedCount, dueNow])
 
   return (
@@ -93,11 +104,42 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
         </span>
       </div>
 
-      <nav className="grid grid-cols-3 gap-2">
+      <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <ShapeTab label="Story" sub="Follow a thread" active={shape === 'thread'} onClick={() => setShape('thread')} />
         <ShapeTab label="Era Lens" sub="A window in time" active={shape === 'era'} onClick={() => setShape('era')} />
         <ShapeTab label="Domain" sub="One subject deep" active={shape === 'domain'} onClick={() => setShape('domain')} />
         <ShapeTab label="Spaced Mix" sub="Just what's due" active={shape === 'spaced'} onClick={() => setShape('spaced')} />
       </nav>
+
+      {shape === 'thread' && (
+        <ul className="space-y-2">
+          {threadSummaries.length === 0 && (
+            <li className="surface p-5 text-sm text-ink-soft">No threads yet.</li>
+          )}
+          {threadSummaries.map((t) => {
+            const empty = t.total === 0
+            return (
+              <li key={t.threadId}>
+                <button
+                  type="button"
+                  disabled={empty}
+                  onClick={() => onStartThread(t.threadId)}
+                  className="surface group w-full p-5 text-left transition-all hover:border-accent/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <h3 className="font-serif text-lg text-ink">{t.name}</h3>
+                  <p className="mt-1 text-sm text-ink-soft">{t.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-softer">
+                    <Pill label="due" value={t.due} accent={t.due > 0} />
+                    <Pill label="new" value={t.newAvailable} accent={t.newAvailable > 0} />
+                    <Pill label="met" value={t.met} />
+                    <Pill label="in story" value={t.total} />
+                  </div>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       {shape === 'era' && (
         <ul className="space-y-2">

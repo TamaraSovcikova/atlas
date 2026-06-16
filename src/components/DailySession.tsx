@@ -10,6 +10,7 @@ type Mode =
   | { kind: 'constellation' }
   | { kind: 'session'; shape: 'era'; eraId: string }
   | { kind: 'session'; shape: 'domain'; domain: Domain }
+  | { kind: 'session'; shape: 'thread'; threadId: string }
   | { kind: 'session'; shape: 'spaced' }
 
 interface Props {
@@ -32,6 +33,7 @@ export function DailySession({ mode, setMode }: Props) {
         shape={mode.shape}
         eraId={mode.shape === 'era' ? mode.eraId : null}
         domain={mode.shape === 'domain' ? mode.domain : null}
+        threadId={mode.shape === 'thread' ? mode.threadId : null}
         onFinished={() => setMode({ kind: 'home' })}
         onCancel={() => setMode({ kind: 'home' })}
       />
@@ -42,6 +44,7 @@ export function DailySession({ mode, setMode }: Props) {
     <HomeView
       onStartEra={(eraId) => setMode({ kind: 'session', shape: 'era', eraId })}
       onStartDomain={(domain) => setMode({ kind: 'session', shape: 'domain', domain })}
+      onStartThread={(threadId) => setMode({ kind: 'session', shape: 'thread', threadId })}
       onStartSpaced={() => setMode({ kind: 'session', shape: 'spaced' })}
       onOpenConstellation={() => setMode({ kind: 'constellation' })}
     />

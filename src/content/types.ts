@@ -45,3 +45,24 @@ export interface BankEra {
   description: string
   displayOrder: number
 }
+
+export interface BankThreadMember {
+  /** id of a concept in the bank. */
+  concept: string
+  /** 1 = anchor (skeleton), 2 = supporting, 3 = detail/story. Default 1. */
+  tier?: number
+}
+
+/**
+ * A narrative thread: a curated, ordered, tiered reading-list over existing
+ * concepts. Members are listed in narrative order. The thread session walks
+ * them chronologically and introduces lower tiers first (skeleton before
+ * detail). A concept may appear in several threads at different tiers.
+ */
+export interface BankThread {
+  id: string
+  name: string
+  description: string
+  displayOrder: number
+  members: BankThreadMember[]
+}

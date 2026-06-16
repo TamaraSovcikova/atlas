@@ -1,7 +1,7 @@
-import type { Concept, Lesson, RecallQuestion } from './schema'
+import type { Concept, Lesson, RecallQuestion, Thread } from './schema'
 import { db } from './schema'
 import { newReview } from '../lib/fsrs'
-import { BANK_CONCEPTS, BANK_ERAS, BANK_VERSION } from '../content'
+import { BANK_CONCEPTS, BANK_ERAS, BANK_THREADS, BANK_VERSION } from '../content'
 
 const FLAG_KEY = `bank:${BANK_VERSION}:loaded`
 
@@ -31,12 +31,33 @@ export async function loadSeedIfNeeded(): Promise<void> {
   const now = Date.now()
   const bankIds = new Set(BANK_CONCEPTS.map((c) => c.id))
 
+  // Invert thread membership: conceptId -> [threadId, ...] for the concept tag.
+  const threadsByConcept = new Map<string, string[]>()
+  for (const t of BANK_THREADS) {
+    for (const m of t.members) {
+      const list = threadsByConcept.get(m.concept) ?? []
+      list.push(t.id)
+      threadsByConcept.set(m.concept, list)
+    }
+  }
+
   await db.transaction(
     'rw',
-    [db.concepts, db.lessons, db.edges, db.reviews, db.settings, db.eras],
+    [db.concepts, db.lessons, db.edges, db.reviews, db.settings, db.eras, db.threads],
     async () => {
       for (const era of BANK_ERAS) {
         await db.eras.put(era)
+      }
+
+      for (const t of BANK_THREADS) {
+        const thread: Thread = {
+          id: t.id,
+          name: t.name,
+          description: t.description,
+          displayOrder: t.displayOrder,
+          members: t.members.map((m) => ({ conceptId: m.concept, tier: m.tier ?? 1 })),
+        }
+        await db.threads.put(thread)
       }
 
       for (const c of BANK_CONCEPTS) {
@@ -52,6 +73,7 @@ export async function loadSeedIfNeeded(): Promise<void> {
           wikipediaUrl: c.wikipedia,
           approxYear: c.approxYear,
           eras: c.eras,
+          threads: threadsByConcept.get(c.id) ?? [],
           lat: c.lat ?? null,
           lng: c.lng ?? null,
           firstSeenAt: existing?.firstSeenAt ?? null,
@@ -104,6 +126,12 @@ export async function loadSeedIfNeeded(): Promise<void> {
         for (const r of stale) if (r.id !== undefined) await db.reviews.delete(r.id)
       }
 
+      // Remove threads the bank no longer defines.
+      const threadIds = new Set(BANK_THREADS.map((t) => t.id))
+      for (const t of await db.threads.toArray()) {
+        if (!threadIds.has(t.id)) await db.threads.delete(t.id)
+      }
+
       await db.settings.put({
         key: FLAG_KEY,
         value: { loadedAt: now, count: BANK_CONCEPTS.length },
@@ -114,3 +142,4 @@ export async function loadSeedIfNeeded(): Promise<void> {
 
 export const SEED_COUNT = BANK_CONCEPTS.length
 export const ERA_COUNT = BANK_ERAS.length
+export const THREAD_COUNT = BANK_THREADS.length

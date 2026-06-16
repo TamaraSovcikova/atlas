@@ -59,6 +59,7 @@ export interface SessionPlan {
   shape: SessionShape
   eraId: string | null
   domain: Domain | null
+  threadId: string | null
 }
 
 export const DEFAULT_NEW_PER_DOMAIN = 1
@@ -377,6 +378,7 @@ function countPlan(
   shape: SessionShape,
   eraId: string | null,
   domain: Domain | null,
+  threadId: string | null = null,
 ): SessionPlan {
   let newCount = 0
   let reviewCount = 0
@@ -390,7 +392,7 @@ function countPlan(
       reviewCount += it.entries.length
     }
   }
-  return { items, newCount, reviewCount, shape, eraId, domain }
+  return { items, newCount, reviewCount, shape, eraId, domain, threadId }
 }
 
 export interface BuildOptions {
@@ -508,6 +510,112 @@ export async function buildSpacedSession(
   const limited = recall.slice(0, maxCards)
   const items = injectGames(limited, policy)
   return countPlan(items, 'spaced', null, null)
+}
+
+/**
+ * Walk a narrative thread. Due reviews from the thread come first; new concepts
+ * are introduced tier-ascending then chronologically, so the skeleton (tier-1
+ * anchors) is taught before the detail (tiers 2-3) that fills in between them.
+ * The whole session is ordered chronologically -- a thread is a timeline.
+ */
+export async function buildThreadSession(
+  threadId: string,
+  prefs: Prefs,
+  now = Date.now(),
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const policy = resolvePolicy(prefs)
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+  const maxNew = options.maxNew ?? 4
+
+  const thread = await db.threads.get(threadId)
+  if (!thread) return countPlan([], 'thread', null, null, threadId)
+
+  const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
+  const memberIds = thread.members.map((m) => m.conceptId)
+  const concepts = (await db.concepts.bulkGet(memberIds)).filter(
+    (c): c is Concept => c !== undefined,
+  )
+  const byId = new Map(concepts.map((c) => [c.id, c]))
+
+  const recall: RecallItem[] = []
+  let rot = 0
+
+  // Due reviews already met in this thread.
+  const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
+  for (const review of dueReviews) {
+    const concept = byId.get(review.conceptId)
+    if (!concept || concept.firstSeenAt === null) continue
+    const item = await makeRecallItem(concept, review, false, policy, 'review', rot++)
+    if (item) recall.push(item)
+  }
+
+  // Introduce new concepts: tier ascending, then chronological. Skeleton first.
+  const fresh = concepts
+    .filter((c) => c.firstSeenAt === null && !recall.some((r) => r.concept.id === c.id))
+    .sort((a, b) => {
+      const ta = tierByConcept.get(a.id) ?? 1
+      const tb = tierByConcept.get(b.id) ?? 1
+      if (ta !== tb) return ta - tb
+      return (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity)
+    })
+  let added = 0
+  for (const concept of fresh) {
+    if (added >= maxNew) break
+    const review = await db.reviews.where('conceptId').equals(concept.id).first()
+    if (!review) continue
+    const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
+    if (item) {
+      recall.push(item)
+      added++
+    }
+  }
+
+  // A thread is a timeline: present chronologically, not interleaved.
+  recall.sort((a, b) => (a.concept.approxYear ?? Infinity) - (b.concept.approxYear ?? Infinity))
+  const limited = recall.slice(0, maxCards)
+  const items = injectGames(limited, { ...policy, games: { ...policy.games, sort: false } })
+  return countPlan(items, 'thread', null, null, threadId)
+}
+
+export interface ThreadSummary {
+  threadId: string
+  name: string
+  description: string
+  due: number
+  newAvailable: number
+  met: number
+  total: number
+}
+
+export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[]> {
+  const threads = await db.threads.orderBy('displayOrder').toArray()
+  const reviewByConcept = new Map<string, Review>()
+  for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
+  const conceptById = new Map<string, Concept>()
+  for (const c of await db.concepts.toArray()) conceptById.set(c.id, c)
+
+  return threads.map((t) => {
+    const summary: ThreadSummary = {
+      threadId: t.id,
+      name: t.name,
+      description: t.description,
+      due: 0,
+      newAvailable: 0,
+      met: 0,
+      total: 0,
+    }
+    for (const m of t.members) {
+      const concept = conceptById.get(m.conceptId)
+      if (!concept) continue
+      summary.total++
+      if (concept.firstSeenAt === null) summary.newAvailable++
+      else summary.met++
+      const review = reviewByConcept.get(m.conceptId)
+      if (review && review.dueAt <= now && concept.firstSeenAt !== null) summary.due++
+    }
+    return summary
+  })
 }
 
 export interface EraSummary {
