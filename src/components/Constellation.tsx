@@ -20,7 +20,8 @@ interface GraphLink {
 interface Props {
   conceptId: string | null
   pulseKey: number
-  mode?: 'focus' | 'explore'
+  // 'preview' = static hero (high warmup, no interaction, no labels)
+  mode?: 'focus' | 'explore' | 'preview'
   height?: number
 }
 
@@ -174,7 +175,8 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
               ctx.stroke()
             }
 
-            // Labels: always for center; in explore for everything; else only known.
+            // Labels: none in preview; always for center; in explore for everything; else only known.
+            if (mode === 'preview') return
             if (mode === 'explore' || n.isCenter || n.known) {
               const fontSize = Math.max((n.isCenter ? 11 : 9) / scale, 2.4)
               ctx.font = `${n.isCenter ? '600 ' : ''}${fontSize}px ui-sans-serif, system-ui, sans-serif`
@@ -184,8 +186,8 @@ export function Constellation({ conceptId, pulseKey, mode = 'focus', height = 24
               ctx.fillText(n.name, n.x, n.y + base + 2)
             }
           }}
-          cooldownTicks={mode === 'explore' ? 140 : 60}
-          warmupTicks={mode === 'explore' ? 40 : 18}
+          cooldownTicks={mode === 'explore' ? 120 : mode === 'preview' ? 0 : 60}
+          warmupTicks={mode === 'explore' ? 40 : mode === 'preview' ? 200 : 18}
           enableZoomInteraction={mode === 'explore'}
           enablePanInteraction={mode === 'explore'}
           enableNodeDrag={mode === 'explore'}

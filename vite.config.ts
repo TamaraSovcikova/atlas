@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Atlas',
         short_name: 'Atlas',
         description: 'A personal general-knowledge engine.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#1a1410',
+        background_color: '#1a1410',
         display: 'standalone',
         start_url: '/',
         icons: [

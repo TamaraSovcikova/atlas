@@ -12,8 +12,8 @@ import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
 import { OrderCard } from './cards/OrderCard'
 import { SortCard } from './cards/SortCard'
-import { ConstellationBanner } from './ConstellationBanner'
 import { Button } from './ui/Button'
+import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, ease } from './ui/motion'
 
 interface Props {
@@ -29,11 +29,6 @@ function primaryConceptId(item: SessionItem): string {
   return item.entries[0]!.concept.id
 }
 
-function primaryConceptName(item: SessionItem): string {
-  if (item.kind === 'recall') return item.concept.name
-  if (item.kind === 'order') return 'Timeline'
-  return 'Sort'
-}
 
 async function recordRating(conceptId: string, rating: RecallRating, now: number) {
   const review = await db.reviews.where('conceptId').equals(conceptId).first()
@@ -69,7 +64,6 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
   const [ratings, setRatings] = useState<RecallRating[]>([])
   const [done, setDone] = useState(false)
   const [activeConcept, setActiveConcept] = useState<string | null>(null)
-  const [activeName, setActiveName] = useState<string>('')
   const [pulseKey, setPulseKey] = useState(0)
 
   useEffect(() => {
@@ -90,7 +84,6 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
       if (p.items.length === 0) setDone(true)
       else {
         setActiveConcept(primaryConceptId(p.items[0]!))
-        setActiveName(primaryConceptName(p.items[0]!))
       }
     }
     load()
@@ -134,7 +127,6 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
       } else {
         setIndex(nextIndex)
         setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
-        setActiveName(primaryConceptName(plan.items[nextIndex]!))
         setPulseKey(0)
       }
     },
@@ -178,10 +170,11 @@ export function SessionView({ shape, eraId, domain, onFinished, onCancel }: Prop
   const progress = (index + (pulseKey > 0 ? 1 : 0)) / plan.items.length
 
   return (
-    <div className="space-y-5">
-      {prefs.showConstellationReveal && (
-        <ConstellationBanner conceptId={activeConcept} conceptName={activeName} pulseKey={pulseKey} />
-      )}
+    <div className="space-y-4">
+      {/* Constellation -- always visible, highlights the active concept */}
+      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card">
+        <ConstellationPreview focusConceptId={activeConcept} pulseKey={pulseKey} height={160} />
+      </div>
 
       <div className="flex items-center justify-between gap-3 text-xs">
         <div className="text-ink-softer">

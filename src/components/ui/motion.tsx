@@ -17,7 +17,7 @@ export function MotionProvider({ children }: { children: ReactNode }) {
 
 // Shared transition presets so motion feels consistent across the app.
 export const spring = { type: 'spring' as const, stiffness: 380, damping: 30 }
-export const ease = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as [number, number, number] }
+export const ease = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }
 
 export const cardVariants = {
   enter: { opacity: 0, y: 14, scale: 0.99 },

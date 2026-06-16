@@ -8,6 +8,7 @@ import {
   type EraSummary,
 } from '../lib/session'
 import { Button } from './ui/Button'
+import { ConstellationPreview } from './ConstellationPreview'
 
 const DOMAIN_LABEL: Record<Domain, string> = {
   history: 'History',
@@ -64,14 +65,33 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
   }, [conceptCount, learnedCount, dueNow])
 
   return (
-    <section className="space-y-8">
-      <header>
-        <h2 className="font-serif text-2xl">Today</h2>
-        <p className="mt-1 text-sm text-ink-soft">
-          Pick a shape for today's ten minutes. Era is the default. Eras let you see how the
-          politics, art, and science of one period fit together.
-        </p>
-      </header>
+    <section className="space-y-7">
+      {/* Constellation -- the hero, always visible */}
+      <button
+        type="button"
+        onClick={onOpenConstellation}
+        className="group w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card transition-all hover:border-accent/30 active:scale-[0.995]"
+      >
+        <ConstellationPreview height={280} />
+        <div className="flex items-center justify-between px-5 pb-4 pt-1">
+          <p className="text-xs text-ink-softer">
+            <span className="font-medium text-ink-soft">{learnedCount ?? 0}</span> of{' '}
+            {conceptCount ?? 0} stars lit
+          </p>
+          <span className="text-[10px] uppercase tracking-widest text-ink-softer opacity-0 transition-opacity group-hover:opacity-100">
+            Explore
+          </span>
+        </div>
+      </button>
+
+      {/* Session start */}
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-serif text-xl text-ink">Today</h2>
+        <span className="text-xs text-ink-softer">
+          <span className="tabular-nums text-ink-soft">{dueNow ?? 0}</span> due ·{' '}
+          <span className="tabular-nums text-ink-soft">{dueTomorrow ?? 0}</span> tomorrow
+        </span>
+      </div>
 
       <nav className="grid grid-cols-3 gap-2">
         <ShapeTab label="Era Lens" sub="A window in time" active={shape === 'era'} onClick={() => setShape('era')} />
@@ -96,7 +116,7 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
                   type="button"
                   disabled={empty}
                   onClick={() => onStartEra(era.id)}
-                  className="surface group w-full p-5 text-left transition-all hover:border-accent/50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="surface group w-full p-5 text-left transition-all hover:border-accent/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="font-serif text-lg text-ink">{era.name}</h3>
@@ -133,7 +153,7 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
                   type="button"
                   disabled={empty}
                   onClick={() => onStartDomain(domain)}
-                  className="surface w-full p-4 text-left transition-all hover:border-accent/50 active:scale-[0.99] disabled:opacity-40"
+                  className="surface w-full p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99] disabled:opacity-40"
                 >
                   <h3 className="font-serif text-base text-ink">{DOMAIN_LABEL[domain]}</h3>
                   <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-ink-softer">
@@ -161,38 +181,9 @@ export function HomeView({ onStartEra, onStartDomain, onStartSpaced, onOpenConst
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onOpenConstellation}
-        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-bg-soft/60 px-5 py-4 text-left transition-colors hover:border-cool/50"
-      >
-        <span>
-          <span className="block font-serif text-base text-ink">Explore your constellation</span>
-          <span className="block text-xs text-ink-softer">
-            {learnedCount ?? 0} of {conceptCount ?? 0} stars lit. See how it all connects.
-          </span>
-        </span>
-        <span className="text-cool">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="2.2" />
-            <circle cx="5" cy="6" r="1.4" />
-            <circle cx="19" cy="7" r="1.4" />
-            <circle cx="18" cy="17" r="1.4" />
-            <path d="M12 12 5 6M12 12l7-5M12 12l6 5" opacity="0.5" />
-          </svg>
-        </span>
-      </button>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="In your graph" value={conceptCount ?? 0} />
-        <Stat label="Met so far" value={learnedCount ?? 0} />
-        <Stat label="Due now" value={dueNow ?? 0} />
-        <Stat label="Due tomorrow" value={dueTomorrow ?? 0} />
-      </div>
-
       <p className="text-xs leading-relaxed text-ink-softer">
-        Forgetting is normal and expected. The cards that feel hardest are the ones the scheduler
-        is working on for you.
+        Forgetting is normal and expected. The cards that feel hardest are the ones the scheduler is
+        working on for you.
       </p>
     </section>
   )
@@ -215,8 +206,8 @@ function ShapeTab({
       onClick={onClick}
       className={`rounded-2xl border px-3 py-3 text-center transition-all active:scale-[0.98] ${
         active
-          ? 'border-accent/70 bg-accent/10 shadow-glow'
-          : 'border-white/10 bg-bg-soft/40 hover:border-accent/40'
+          ? 'border-accent/60 bg-accent/10 shadow-glow'
+          : 'border-white/[0.07] bg-bg-soft/40 hover:border-accent/30'
       }`}
     >
       <span className={`block text-sm font-medium ${active ? 'text-accent' : 'text-ink'}`}>
@@ -224,15 +215,6 @@ function ShapeTab({
       </span>
       <span className="block text-[10px] uppercase tracking-wide text-ink-softer">{sub}</span>
     </button>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-bg-softer/30 bg-bg-soft/70 p-3">
-      <p className="text-2xl font-medium text-ink">{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-ink-softer">{label}</p>
-    </div>
   )
 }
 
