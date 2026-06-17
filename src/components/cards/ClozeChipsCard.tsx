@@ -6,7 +6,8 @@ import { Brief } from '../Brief'
 interface Props {
   item: RecallItem
   onAnswered: (conceptId: string) => void
-  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
+  onRevealed: (rating: RecallRating | null) => void
+  onConceptClick: (conceptId: string) => void
 }
 
 const BLANK = '____'
@@ -20,7 +21,7 @@ function shuffle<T>(arr: T[]): T[] {
   return out
 }
 
-export function ClozeChipsCard({ item, onAnswered, onDone }: Props) {
+export function ClozeChipsCard({ item, onAnswered, onRevealed, onConceptClick }: Props) {
   const { concept, question } = item
   const answer = question.expectedAnswer
   const chips = useMemo(
@@ -35,8 +36,10 @@ export function ClozeChipsCard({ item, onAnswered, onDone }: Props) {
 
   function pick(chip: string) {
     if (picked !== null) return
+    const isCorrect = chip.toLowerCase() === answer.toLowerCase()
     setPicked(chip)
     onAnswered(concept.id)
+    onRevealed(isCorrect ? 'good' : 'again')
   }
 
   function renderPrompt() {
@@ -75,7 +78,7 @@ export function ClozeChipsCard({ item, onAnswered, onDone }: Props) {
           </span>
         )}
       </header>
-      {item.isNew && <Brief concept={concept} variant="intro" />}
+      {item.isNew && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
       {renderPrompt()}
       <div className="flex flex-wrap gap-2">
         {chips.map((chip) => {
@@ -103,19 +106,10 @@ export function ClozeChipsCard({ item, onAnswered, onDone }: Props) {
         })}
       </div>
       {picked !== null && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-ink-soft">
-            {correct ? 'Yes.' : `Not yet. It is ${answer}.`}{' '}
-            {!correct && <span className="text-ink-softer">You will see this again soon.</span>}
-          </p>
-          <button
-            type="button"
-            onClick={() => onDone([{ conceptId: concept.id, rating: correct ? 'good' : 'again' }])}
-            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
-          >
-            Next
-          </button>
-        </div>
+        <p className="text-sm text-ink-soft">
+          {correct ? 'Yes.' : `Not yet. It is ${answer}.`}{' '}
+          {!correct && <span className="text-ink-softer">You will see this again soon.</span>}
+        </p>
       )}
     </article>
   )

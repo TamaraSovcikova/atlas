@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react'
 import type { RecallItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
 import { Brief } from '../Brief'
-import { RatingRow } from '../RatingRow'
 
 interface Props {
   item: RecallItem
   onAnswered: (conceptId: string) => void
-  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
+  onRevealed: (rating: RecallRating | null) => void
+  onConceptClick: (conceptId: string) => void
 }
 
-export function FreeCard({ item, onAnswered, onDone }: Props) {
+export function FreeCard({ item, onAnswered, onRevealed, onConceptClick }: Props) {
   const { concept, question } = item
   const [typed, setTyped] = useState('')
   const [revealed, setRevealed] = useState(false)
@@ -23,6 +23,7 @@ export function FreeCard({ item, onAnswered, onDone }: Props) {
   function reveal() {
     setRevealed(true)
     onAnswered(concept.id)
+    onRevealed(null)
   }
 
   return (
@@ -37,7 +38,7 @@ export function FreeCard({ item, onAnswered, onDone }: Props) {
           </span>
         )}
       </header>
-      {item.isNew && <Brief concept={concept} variant="intro" />}
+      {item.isNew && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
       <p className="text-lg leading-relaxed text-ink">{question.prompt}</p>
       <textarea
         value={typed}
@@ -59,13 +60,10 @@ export function FreeCard({ item, onAnswered, onDone }: Props) {
         </div>
       )}
       {revealed && (
-        <>
-          <section className="rounded-xl border border-accent/30 bg-accent/5 p-4">
-            <p className="text-[11px] uppercase tracking-wider text-accent">Answer</p>
-            <p className="mt-2 text-ink">{question.expectedAnswer}</p>
-          </section>
-          <RatingRow onRate={(rating) => onDone([{ conceptId: concept.id, rating }])} />
-        </>
+        <section className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+          <p className="text-[11px] uppercase tracking-wider text-accent">Answer</p>
+          <p className="mt-2 text-ink">{question.expectedAnswer}</p>
+        </section>
       )}
     </article>
   )

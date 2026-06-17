@@ -5,7 +5,7 @@ import type { RecallRating } from '../../lib/fsrs'
 interface Props {
   item: RecallItem
   onAnswered: (conceptId: string) => void
-  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
+  onRevealed: (rating: RecallRating | null) => void
 }
 
 interface GeoFeature {
@@ -63,7 +63,7 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
-export function MapCard({ item, onAnswered, onDone }: Props) {
+export function MapCard({ item, onAnswered, onRevealed }: Props) {
   const { concept } = item
   const svgRef = useRef<SVGSVGElement>(null)
   const [paths, setPaths] = useState<string[]>([])
@@ -92,8 +92,11 @@ export function MapCard({ item, onAnswered, onDone }: Props) {
     const y = ((e.clientY - rect.top) / rect.height) * H
     const lng = x - 180
     const lat = 90 - y
+    const d = haversineKm(lat, lng, targetLat, targetLng)
+    const isCorrect = d <= CORRECT_KM
     setTap({ lng, lat })
     onAnswered(concept.id)
+    onRevealed(isCorrect ? 'good' : 'again')
   }
 
   const targetXY = { x: targetLng + 180, y: 90 - targetLat }
@@ -137,20 +140,11 @@ export function MapCard({ item, onAnswered, onDone }: Props) {
       </div>
 
       {tap && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-ink-soft">
-            {correct
-              ? 'Spot on.'
-              : `About ${Math.round(distance!).toLocaleString()} km off. The pin shows the spot.`}
-          </p>
-          <button
-            type="button"
-            onClick={() => onDone([{ conceptId: concept.id, rating: correct ? 'good' : 'again' }])}
-            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
-          >
-            Next
-          </button>
-        </div>
+        <p className="text-sm text-ink-soft">
+          {correct
+            ? 'Spot on.'
+            : `About ${Math.round(distance!).toLocaleString()} km off. The pin shows the spot.`}
+        </p>
       )}
     </article>
   )

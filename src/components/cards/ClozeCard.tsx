@@ -2,17 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import type { RecallItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
 import { Brief } from '../Brief'
-import { RatingRow } from '../RatingRow'
 
 interface Props {
   item: RecallItem
   onAnswered: (conceptId: string) => void
-  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
+  onRevealed: (rating: RecallRating | null) => void
+  onConceptClick: (conceptId: string) => void
 }
 
 const BLANK = '____'
 
-export function ClozeCard({ item, onAnswered, onDone }: Props) {
+export function ClozeCard({ item, onAnswered, onRevealed, onConceptClick }: Props) {
   const { concept, question } = item
   const [typed, setTyped] = useState('')
   const [revealed, setRevealed] = useState(false)
@@ -31,6 +31,8 @@ export function ClozeCard({ item, onAnswered, onDone }: Props) {
     if (revealed) return
     setRevealed(true)
     onAnswered(concept.id)
+    // null = let user self-grade via swipe (typed input is imprecise for exact match)
+    onRevealed(null)
   }
 
   function renderPrompt() {
@@ -79,7 +81,7 @@ export function ClozeCard({ item, onAnswered, onDone }: Props) {
           </span>
         )}
       </header>
-      {item.isNew && <Brief concept={concept} variant="intro" />}
+      {item.isNew && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -100,15 +102,10 @@ export function ClozeCard({ item, onAnswered, onDone }: Props) {
           </div>
         )}
       </form>
-      {revealed && (
-        <>
-          {typed.trim().length > 0 && !userCorrect && (
-            <p className="text-xs text-ink-softer">
-              You said <span className="text-ink-soft">"{typed.trim()}"</span>.
-            </p>
-          )}
-          <RatingRow onRate={(rating) => onDone([{ conceptId: concept.id, rating }])} />
-        </>
+      {revealed && typed.trim().length > 0 && !userCorrect && (
+        <p className="text-xs text-ink-softer">
+          You said <span className="text-ink-soft">"{typed.trim()}"</span>.
+        </p>
       )}
     </article>
   )

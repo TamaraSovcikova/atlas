@@ -1,11 +1,13 @@
 import type { Concept } from '../db/schema'
+import { LinkedText } from './LinkedText'
 
 interface Props {
   concept: Concept
   variant?: 'intro' | 'reveal'
+  onConceptClick?: (conceptId: string) => void
 }
 
-export function Brief({ concept, variant = 'intro' }: Props) {
+export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
   const tone =
     variant === 'intro'
       ? 'border-accent/30 bg-accent/5'
@@ -29,7 +31,13 @@ export function Brief({ concept, variant = 'intro' }: Props) {
           />
         </div>
       )}
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft">{concept.summary}</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+        {onConceptClick ? (
+          <LinkedText text={concept.summary} onConceptClick={onConceptClick} />
+        ) : (
+          concept.summary
+        )}
+      </p>
       {concept.wikipediaUrl && (
         <a
           href={concept.wikipediaUrl}

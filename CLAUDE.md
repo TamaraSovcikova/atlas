@@ -62,7 +62,7 @@ load. So a deployed change takes two page loads to appear -- not a bug.
 
 ## Current state (one sentence; date it)
 
-2026-06-17: Images added across 19 concepts (BANK_VERSION v7). Every concept with an imageUrl shows a Wikimedia thumbnail on first encounter (Brief.tsx intro variant, onError silent fallback). People: Marx, Darwin, Tesla, Curie, Einstein, da Vinci, Newton, Napoleon, Ludovit Stur, Cyril and Methodius. Events: Franz Ferdinand (WWI), Lenin (Russian Revolution), D-Day (WWII), Auschwitz gate (Holocaust), atomic bomb, Cuban Missile Crisis, Moon landing, Berlin Wall fall, Velvet Revolution, French Revolution (Bastille), Prague Spring (Soviet tanks). All use Special:FilePath Wikimedia redirect. Slovak thread "Slovakia through the centuries" (16 members) and 9 new Slovak concepts added same session. BANK_VERSION v7. NEXT: FSRS-stability-gated tier unlock; light Daylight theme; verify any broken imageUrl filenames.
+2026-06-17: Three UX features shipped. (1) Overflow fix: recall card content scrollable (max-h 55svh), swipe zone always visible below. (2) Swipeable rating: SwipeRatingZone.tsx replaces all "Next" buttons and RatingRow -- swipe left = See again, right = Got it; chip/contrast/map cards pre-suggest rating, free/cloze prompt self-grade. (3) Concept rabbit hole: LinkedText.tsx linkifies concept names in Brief summaries; clicking opens ConceptRabbitHole.tsx (vaul bottom drawer) with drill-down nav stack and Return button. BANK_VERSION v7 (unchanged). NEXT: deploy; FSRS-stability-gated tier unlock; light Daylight theme.
 
 Phase 6 (2026-06-16): narrative Threads engine shipped. Thread is a curated ordered tiered reading-list; "Story" is default home tab; first thread "The short twentieth century" (18 existing concepts).
 

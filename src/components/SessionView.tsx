@@ -13,6 +13,8 @@ import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
 import { OrderCard } from './cards/OrderCard'
 import { SortCard } from './cards/SortCard'
+import { SwipeRatingZone } from './SwipeRatingZone'
+import { ConceptRabbitHole } from './ConceptRabbitHole'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, ease } from './ui/motion'
@@ -30,7 +32,6 @@ function primaryConceptId(item: SessionItem): string {
   if (item.kind === 'recall') return item.concept.id
   return item.entries[0]!.concept.id
 }
-
 
 async function recordRating(conceptId: string, rating: RecallRating, now: number) {
   const review = await db.reviews.where('conceptId').equals(conceptId).first()
@@ -68,6 +69,8 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const [done, setDone] = useState(false)
   const [activeConcept, setActiveConcept] = useState<string | null>(null)
   const [pulseKey, setPulseKey] = useState(0)
+  const [revealedRating, setRevealedRating] = useState<RecallRating | null | undefined>(undefined)
+  const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -99,6 +102,11 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape, eraId, domain, threadId])
+
+  // Reset swipe zone state when the card changes
+  useEffect(() => {
+    setRevealedRating(undefined)
+  }, [index])
 
   const current: SessionItem | null = useMemo(() => {
     if (!plan) return null
@@ -141,6 +149,18 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     [plan, index, startedAt],
   )
 
+  const handleRevealed = useCallback((rating: RecallRating | null) => {
+    setRevealedRating(rating)
+  }, [])
+
+  const handleRate = useCallback(
+    async (rating: RecallRating) => {
+      if (!current || current.kind !== 'recall') return
+      await handleDone([{ conceptId: current.concept.id, rating }])
+    },
+    [current, handleDone],
+  )
+
   if (!plan) {
     return <p className="text-ink-softer">Building today's session...</p>
   }
@@ -176,62 +196,83 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   if (!current) return <p className="text-ink-softer">Session ended.</p>
 
   const progress = (index + (pulseKey > 0 ? 1 : 0)) / plan.items.length
+  const isRecallCard = current.kind === 'recall'
+  const swipeVisible = isRecallCard && revealedRating !== undefined
 
   return (
-    <div className="space-y-4">
-      {/* Constellation -- always visible, highlights the active concept */}
-      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card">
-        <ConstellationPreview focusConceptId={activeConcept} pulseKey={pulseKey} height={160} />
-      </div>
-
-      <div className="flex items-center justify-between gap-3 text-xs">
-        <div className="text-ink-softer">
-          {shape === 'era' && era && <span className="text-ink-soft">{era.name}</span>}
-          {shape === 'domain' && domain && (
-            <span className="text-ink-soft capitalize">{domain.replace('_', ' ')}</span>
-          )}
-          {shape === 'thread' && threadName && (
-            <span className="text-ink-soft">{threadName}</span>
-          )}
-          {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
-          <span className="ml-3">
-            {index + 1} of {plan.items.length}
-          </span>
+    <>
+      <div className="space-y-4">
+        {/* Constellation strip */}
+        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card">
+          <ConstellationPreview focusConceptId={activeConcept} pulseKey={pulseKey} height={160} />
         </div>
-        <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
-          End session
-        </button>
+
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <div className="text-ink-softer">
+            {shape === 'era' && era && <span className="text-ink-soft">{era.name}</span>}
+            {shape === 'domain' && domain && (
+              <span className="text-ink-soft capitalize">{domain.replace('_', ' ')}</span>
+            )}
+            {shape === 'thread' && threadName && (
+              <span className="text-ink-soft">{threadName}</span>
+            )}
+            {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
+            <span className="ml-3">
+              {index + 1} of {plan.items.length}
+            </span>
+          </div>
+          <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
+            End session
+          </button>
+        </div>
+
+        <div className="h-1 overflow-hidden rounded-full bg-bg-softer">
+          <M.div
+            className="h-full rounded-full bg-accent-grad"
+            animate={{ width: `${Math.round(progress * 100)}%` }}
+            transition={ease}
+          />
+        </div>
+
+        <AnimatePresence mode="wait">
+          <M.div
+            key={current.cardKey}
+            variants={cardVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={ease}
+            className="surface overflow-hidden"
+          >
+            {/* Scrollable card content */}
+            <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(55svh)' }}>
+              {isRecallCard && (
+                <RecallCard
+                  item={current}
+                  onAnswered={handleAnswered}
+                  onRevealed={handleRevealed}
+                  onConceptClick={setRabbitHoleId}
+                />
+              )}
+              {current.kind === 'order' && (
+                <OrderCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+              )}
+              {current.kind === 'sort' && (
+                <SortCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+              )}
+            </div>
+
+            {/* Swipe zone appears after reveal, outside the scroll area */}
+            {swipeVisible && (
+              <div className="border-t border-white/[0.06] px-6 pb-6 pt-4">
+                <SwipeRatingZone onRate={handleRate} suggestedRating={revealedRating} />
+              </div>
+            )}
+          </M.div>
+        </AnimatePresence>
       </div>
 
-      <div className="h-1 overflow-hidden rounded-full bg-bg-softer">
-        <M.div
-          className="h-full rounded-full bg-accent-grad"
-          animate={{ width: `${Math.round(progress * 100)}%` }}
-          transition={ease}
-        />
-      </div>
-
-      <AnimatePresence mode="wait">
-        <M.div
-          key={current.cardKey}
-          variants={cardVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={ease}
-          className="surface p-6"
-        >
-          {current.kind === 'recall' && (
-            <RecallCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
-          )}
-          {current.kind === 'order' && (
-            <OrderCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
-          )}
-          {current.kind === 'sort' && (
-            <SortCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
-          )}
-        </M.div>
-      </AnimatePresence>
-    </div>
+      <ConceptRabbitHole rootConceptId={rabbitHoleId} onClose={() => setRabbitHoleId(null)} />
+    </>
   )
 }

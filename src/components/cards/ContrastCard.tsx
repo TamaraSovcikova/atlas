@@ -6,7 +6,8 @@ import { Brief } from '../Brief'
 interface Props {
   item: RecallItem
   onAnswered: (conceptId: string) => void
-  onDone: (ratings: { conceptId: string; rating: RecallRating }[]) => void
+  onRevealed: (rating: RecallRating | null) => void
+  onConceptClick: (conceptId: string) => void
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -18,7 +19,7 @@ function shuffle<T>(arr: T[]): T[] {
   return out
 }
 
-export function ContrastCard({ item, onAnswered, onDone }: Props) {
+export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: Props) {
   const { concept, question } = item
   const correct = question.expectedAnswer
   const distractors = question.distractors ?? []
@@ -35,8 +36,10 @@ export function ContrastCard({ item, onAnswered, onDone }: Props) {
 
   function pick(opt: string) {
     if (picked !== null) return
+    const isCorrect = opt === correct
     setPicked(opt)
     onAnswered(concept.id)
+    onRevealed(isCorrect ? 'good' : 'again')
   }
 
   return (
@@ -55,7 +58,7 @@ export function ContrastCard({ item, onAnswered, onDone }: Props) {
           </span>
         ) : null}
       </header>
-      {showBrief && <Brief concept={concept} variant="intro" />}
+      {showBrief && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
       <p className="text-lg text-ink">{question.prompt}</p>
       <ul className="space-y-2">
         {options.map((opt) => {
@@ -84,19 +87,10 @@ export function ContrastCard({ item, onAnswered, onDone }: Props) {
         })}
       </ul>
       {picked !== null && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-ink-soft">
-            {gotIt ? 'Yes. ' : 'Not yet. '}
-            <span className="text-accent">{correct}</span>.
-          </p>
-          <button
-            type="button"
-            onClick={() => onDone([{ conceptId: concept.id, rating: gotIt ? 'good' : 'again' }])}
-            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
-          >
-            Next
-          </button>
-        </div>
+        <p className="text-sm text-ink-soft">
+          {gotIt ? 'Yes. ' : 'Not yet. '}
+          <span className="text-accent">{correct}</span>.
+        </p>
       )}
     </article>
   )
