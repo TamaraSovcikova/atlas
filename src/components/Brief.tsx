@@ -16,6 +16,19 @@ export function Brief({ concept, variant = 'intro' }: Props) {
         <p className="text-[11px] uppercase tracking-wider text-accent">New today</p>
       )}
       <h3 className="mt-1 font-serif text-lg text-ink">{concept.name}</h3>
+      {variant === 'intro' && concept.imageUrl && (
+        <div className="mt-3 overflow-hidden rounded-xl">
+          <img
+            src={concept.imageUrl}
+            alt={concept.name}
+            className="h-36 w-full object-cover"
+            onError={(e) => {
+              const el = e.currentTarget.parentElement
+              if (el) el.style.display = 'none'
+            }}
+          />
+        </div>
+      )}
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">{concept.summary}</p>
       {concept.wikipediaUrl && (
         <a

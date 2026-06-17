@@ -33,6 +33,8 @@ export interface BankConcept {
   /** 2-3 sentences, vivid, concrete, accurate. Ends implicitly cited by `wikipedia`. */
   summary: string
   wikipedia: string
+  /** Wikimedia Commons thumbnail URL shown in the Brief on first encounter. */
+  imageUrl?: string | null
   questions: BankQuestion[]
   edges: { to: string; relation: RelationType }[]
 }

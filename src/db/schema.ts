@@ -62,6 +62,7 @@ export interface Concept {
   lessonId: string | null
   summary: string
   wikipediaUrl: string | null
+  imageUrl?: string | null
   approxYear: number | null
   eras: string[]
   threads: string[]

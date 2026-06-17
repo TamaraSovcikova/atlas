@@ -71,6 +71,7 @@ export async function loadSeedIfNeeded(): Promise<void> {
           lessonId,
           summary: c.summary,
           wikipediaUrl: c.wikipedia,
+          imageUrl: c.imageUrl ?? null,
           approxYear: c.approxYear,
           eras: c.eras,
           threads: threadsByConcept.get(c.id) ?? [],

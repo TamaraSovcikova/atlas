@@ -5,18 +5,20 @@ import { ANCIENT } from './bank/ancient'
 import { EARLY_MODERN } from './bank/earlyModern'
 import { INDUSTRIAL } from './bank/industrial'
 import { CONTEMPORARY } from './bank/contemporary'
+import { SLOVAK } from './bank/slovak'
 
 /**
  * Bump when the bank content changes so the loader re-syncs it into Dexie.
  * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
  */
-export const BANK_VERSION = 'v5'
+export const BANK_VERSION = 'v6'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,
   ...EARLY_MODERN,
   ...INDUSTRIAL,
   ...CONTEMPORARY,
+  ...SLOVAK,
 ]
 
 export const BANK_ERAS: BankEra[] = ERAS
