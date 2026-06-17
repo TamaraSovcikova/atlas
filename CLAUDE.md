@@ -58,13 +58,15 @@ from a non-login shell fails -- source `~/.nvm/nvm.sh` first.
 
 ## Current state (one sentence; date it)
 
-2026-06-16: Phase 5 editorial redesign shipped. Warm Observatory palette (warm near-black #1a1410, no blue-black), Fraunces display + Plus Jakarta Sans body via Google Fonts CDN, constellation regression fixed. Home screen: new ConstellationPreview static canvas hero (golden-spiral layout, domain-colour star glows, always visible, 280px). Session screen: ConstellationPreview (160px) always visible above the progress bar showing active concept highlighted with connection lines -- replaces the old collapsed vaul drawer. Interactive ForceGraph preserved for the dedicated full-screen explore view only. Focus is personal use, not commercial.
+2026-06-16: Phase 6 -- narrative Threads engine shipped (deployed live). A Thread is a curated, ordered, tiered reading-list over existing concepts, cutting vertically through eras the way you'd walk someone through a country's history (vs Era Lens, a horizontal slice). Skeleton-first: the thread session introduces tier-1 anchors before tier-2/3 detail, walks members chronologically, due reviews first. "Story" is now the default home tab; first thread "The short twentieth century" spans 18 existing 20th-century concepts (WWI to the EU). Schema at Dexie v3 (Thread table, ThreadMember, Concept.threads multiEntry); BANK_VERSION v5. NEXT (content phase): author the Slovak / Central-European anchors (Great Moravia, Austria-Hungary, Czechoslovakia 1918, 1968, 1989, 1993 split) as their own concepts + thread; later, a dedicated vertical-timeline thread screen and FSRS-stability-gated tier unlock.
+
+Phase 5 (same day): Warm Observatory palette (#1a1410, no blue-black), Fraunces + Plus Jakarta Sans self-hosted (public/fonts, offline), constellation regression fixed -- ConstellationPreview static canvas is the home hero (280px) and in-session strip (160px, highlights active concept); interactive ForceGraph only in full-screen explore.
 
 Libraries (all MIT): @dnd-kit, motion (LazyMotion `m`), vaul, react-force-graph-2d, dexie, ts-fsrs, zustand.
 
-KNOWN FOLLOW-UP: Fonts from Google Fonts CDN (breaks true offline PWA). Self-host Fraunces + Plus Jakarta Sans woff2 in public/fonts/ when going offline-first. Light "Daylight gallery" theme not yet implemented.
+KNOWN FOLLOW-UP: Light "Daylight gallery" theme not yet implemented. Thread depth-tier unlock is intro-order only (no FSRS-stability gate yet). Main JS chunk ~164KB gzip.
 
-Last updated: 2026-05-30 by claude-code
+Last updated: 2026-06-16 by claude-code
 
 > See `docs/EVOLUTION.md` for the journey.
 
@@ -112,6 +114,7 @@ Highlights:
 Implementation notes for future sessions:
 - **Content bank**: `src/content/` is the shared knowledge bank (`bank/*.ts` BankConcept arrays by era-cluster, `eras.ts`, `index.ts` assembling + `validateBank()` tested in `bank.test.ts`). `db/seed.ts` syncs it into Dexie on each `BANK_VERSION` bump, preserving progress + personal edges, pruning removed concepts. Author more as Claude Code on the Max plan (NOT the API key), Wikipedia URL per concept, bump `BANK_VERSION`.
 - **Recall variety is position-driven**: `chooseQuestion` in `session.ts` rotates format by the card's session index (`rotationIndex`), not `review.reps`. Do not regate on maturity or a cold start goes all-cloze.
+- **Threads** (`src/content/threads.ts`, `Thread`/`ThreadMember` in schema): a thread is a curated ordered list of `{concept, tier}` members over existing concepts. Membership is defined centrally in threads.ts (not on each BankConcept) so a thread can pull concepts from many era-files and a concept can be a tier-1 anchor in one thread and tier-2 detail in another. Seed inverts membership into `concept.threads` (multiEntry index) and stores the ordered `members` on the `Thread` record. `buildThreadSession` introduces new concepts tier-ascending then chronologically (skeleton before detail) and orders the whole session by `approxYear`. To add a thread: append to `THREADS`, bump `BANK_VERSION`. To add Slovak-specific anchors: author them as concepts in a bank file first, then list them in the thread.
 - **Design system**: tokens in `tailwind.config.js`; `.surface`/`.surface-raised`/`.chip` in `index.css`; motion via `src/components/ui/motion.tsx` (LazyMotion `m` to keep bundle down) + `Button.tsx`. `prefers-reduced-motion` handled globally.
 - **Constellation**: Two implementations. `ConstellationPreview.tsx` is a lightweight static canvas (golden-angle spiral positions, no physics, domain-colour glows, focus mode highlights concept + draws connection lines). Used as home hero (280px) and in-session strip (160px). `Constellation.tsx` (react-force-graph-2d) is lazy-imported only by `ConstellationScreen.tsx` (full-screen explore). Never use the ForceGraph on first-paint paths -- the physics simulation freezes CDP screenshots and is expensive.
 - **Drag**: `OrderCard` uses @dnd-kit (Pointer + Touch sensor, 120ms hold so scroll still works). `SortCard` is tap-to-select-then-tap-bucket (more reliable on touch than drop zones).
