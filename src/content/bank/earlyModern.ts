@@ -65,6 +65,7 @@ export const EARLY_MODERN: BankConcept[] = [
     summary:
       'The model of the Renaissance genius: painter of the Mona Lisa and The Last Supper, but also an anatomist, engineer, and inventor who filled notebooks with designs centuries ahead of their time. He embodied the era\'s belief that one mind could master art and science alike.',
     wikipedia: 'https://en.wikipedia.org/wiki/Leonardo_da_Vinci',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_retouched.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -180,6 +181,7 @@ export const EARLY_MODERN: BankConcept[] = [
     summary:
       'An English physicist and mathematician whose 1687 book set out the laws of motion and universal gravitation, explaining both falling apples and orbiting planets with the same mathematics. He also co-invented calculus. His physics governed science for over two centuries until Einstein.',
     wikipedia: 'https://en.wikipedia.org/wiki/Isaac_Newton',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/GodfreyKneller-IsaacNewton-1689.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -283,6 +285,7 @@ export const EARLY_MODERN: BankConcept[] = [
     summary:
       'From 1789 France overthrew its monarchy in a decade of upheaval driven by debt, hunger, and Enlightenment ideas. The storming of the Bastille and the Declaration of the Rights of Man gave way to the Terror and then to Napoleon. It created the modern ideas of citizenship and secular government.',
     wikipedia: 'https://en.wikipedia.org/wiki/French_Revolution',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Prise_de_la_Bastille.jpg?width=300',
     questions: [
       { format: 'cloze', prompt: 'The French Revolution began in the year ____.', answer: '1789' },
       {
@@ -307,6 +310,7 @@ export const EARLY_MODERN: BankConcept[] = [
     summary:
       'A general who rose in the French Revolution and crowned himself emperor in 1804. He conquered most of Europe and spread a reformed legal code, the Napoleonic Code, that still shapes law today. He was finally defeated at the Battle of Waterloo in 1815.',
     wikipedia: 'https://en.wikipedia.org/wiki/Napoleon',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Jacques-Louis_David_-_The_Emperor_Napoleon_in_His_Study_at_the_Tuileries_-_Google_Art_Project.jpg?width=300',
     questions: [
       {
         format: 'cloze',

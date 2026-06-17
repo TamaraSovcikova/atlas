@@ -137,6 +137,7 @@ export const CONTEMPORARY: BankConcept[] = [
     summary:
       'In October 1962 the United States discovered Soviet nuclear missiles in Cuba, 90 miles from Florida. For thirteen days the world stood on the brink of nuclear war until the USSR agreed to remove them. It was the closest the Cold War came to going hot.',
     wikipedia: 'https://en.wikipedia.org/wiki/Cuban_Missile_Crisis',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Kennedy_address_Cuban_Missile_Crisis.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -155,6 +156,7 @@ export const CONTEMPORARY: BankConcept[] = [
     summary:
       'In July 1969 the US mission Apollo 11 landed the first humans on the Moon, with Neil Armstrong the first to step onto its surface. It was the triumph of the space race against the Soviet Union and remains one of the greatest feats of engineering in history.',
     wikipedia: 'https://en.wikipedia.org/wiki/Apollo_11',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Buzz_Aldrin_Apollo_11_original.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -230,6 +232,7 @@ export const CONTEMPORARY: BankConcept[] = [
     summary:
       'On 9 November 1989 the wall dividing communist East Berlin from West Berlin was opened, and crowds crossed freely for the first time since 1961. It became the symbol of the collapse of communism in eastern Europe and the end of the Cold War.',
     wikipedia: 'https://en.wikipedia.org/wiki/Fall_of_the_Berlin_Wall',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Berlinermauer.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -260,6 +263,7 @@ export const CONTEMPORARY: BankConcept[] = [
     summary:
       'The peaceful overthrow of communist rule in Czechoslovakia in late 1989, achieved through mass protest in a matter of weeks without bloodshed. The dissident playwright Vaclav Havel became president. Three years later the country split peacefully into the Czech Republic and Slovakia.',
     wikipedia: 'https://en.wikipedia.org/wiki/Velvet_Revolution',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Velvet_revolution_1989_Prague.jpg?width=300',
     questions: [
       {
         format: 'cloze',

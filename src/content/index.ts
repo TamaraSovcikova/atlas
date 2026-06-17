@@ -11,7 +11,7 @@ import { SLOVAK } from './bank/slovak'
  * Bump when the bank content changes so the loader re-syncs it into Dexie.
  * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
  */
-export const BANK_VERSION = 'v6'
+export const BANK_VERSION = 'v7'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,

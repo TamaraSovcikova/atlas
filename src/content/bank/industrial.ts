@@ -12,6 +12,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'A German philosopher whose 1848 Communist Manifesto and later book Das Kapital argued that history is driven by class struggle and that capitalism would be overthrown by the workers. His ideas inspired socialist and communist movements that shaped the 20th century.',
     wikipedia: 'https://en.wikipedia.org/wiki/Karl_Marx',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Karl_Marx_001.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -40,6 +41,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'An English naturalist whose 1859 book On the Origin of Species set out evolution by natural selection: individuals better suited to their environment leave more offspring, so species change over time. It reframed all of biology and the human place in nature.',
     wikipedia: 'https://en.wikipedia.org/wiki/Charles_Darwin',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Charles_Darwin_by_Julia_Margaret_Cameron.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -120,6 +122,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'A Serbian-American inventor whose alternating-current (AC) system became the way almost all electricity is delivered today. He won the "war of the currents" against Thomas Edison, who backed direct current. He held about 300 patents and died poor and underappreciated.',
     wikipedia: 'https://en.wikipedia.org/wiki/Nikola_Tesla',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Tesla_circa_1890.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -171,6 +174,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'A Polish-French physicist and chemist who discovered the elements polonium and radium and coined the term radioactivity. She is the only person to win Nobel Prizes in two different sciences, physics and chemistry. She died of an illness caused by her long exposure to radiation.',
     wikipedia: 'https://en.wikipedia.org/wiki/Marie_Curie',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Marie_Curie_c._1920s.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -195,6 +199,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'A German-born physicist who reshaped our picture of reality. His 1905 theory of special relativity gave the famous equation E=mc squared, and his 1915 general relativity recast gravity as the bending of space and time. He fled Nazi Germany and warned the US that nuclear weapons were possible.',
     wikipedia: 'https://en.wikipedia.org/wiki/Albert_Einstein',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Albert_Einstein_Head.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -275,6 +280,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'In June 1914 the assassination of Archduke Franz Ferdinand of Austria-Hungary in Sarajevo set off a chain of alliances that pulled Europe into war within weeks. The deeper causes were great-power rivalry and a tangle of mutual-defence treaties. The war lasted until 1918 and killed millions.',
     wikipedia: 'https://en.wikipedia.org/wiki/World_War_I',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Assassination_of_Archduke_Franz_Ferdinand.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -305,6 +311,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'In 1917, amid the suffering of World War I, revolution swept away the Russian monarchy and brought Lenin\'s Bolsheviks to power, the first communist government. It created the Soviet Union and made Marx\'s ideas a world force, setting up the Cold War decades later.',
     wikipedia: 'https://en.wikipedia.org/wiki/Russian_Revolution',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Lenin_CL_Smithsonian.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -372,6 +379,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'The deadliest conflict in history, from 1939 to 1945, fought between the Allies and the Axis powers led by Nazi Germany, Italy, and Japan. It killed an estimated 70 to 85 million people, included the Holocaust, and ended with the first use of nuclear weapons. It reshaped the entire world order.',
     wikipedia: 'https://en.wikipedia.org/wiki/World_War_II',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Normandy_Invasion,_June_1944.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -402,6 +410,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'The systematic murder of about six million Jews by Nazi Germany and its collaborators during World War II, along with millions of others. It was carried out in ghettos and death camps such as Auschwitz. It stands as the defining genocide of the modern age and shaped postwar human-rights law.',
     wikipedia: 'https://en.wikipedia.org/wiki/The_Holocaust',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Auschwitz_I_Gate.jpg?width=300',
     questions: [
       {
         format: 'cloze',
@@ -422,6 +431,7 @@ export const INDUSTRIAL: BankConcept[] = [
     summary:
       'The first atomic bombs were developed by the United States in the Manhattan Project and dropped on the Japanese cities of Hiroshima and Nagasaki in August 1945, ending World War II. Their terrifying power defined the Cold War, when the US and USSR built enough to destroy the world many times over.',
     wikipedia: 'https://en.wikipedia.org/wiki/Nuclear_weapon',
+    imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Atomic_bombing_of_Japan.jpg?width=300',
     questions: [
       {
         format: 'cloze',
