@@ -56,6 +56,10 @@ PWA (Add to Home Screen). Local-first: progress is per-device, not yet synced ac
 devices (sync is Phase 2). Dev server in WSL: `node` is via nvm, so a plain `npm run dev`
 from a non-login shell fails -- source `~/.nvm/nvm.sh` first.
 
+After a deploy the PWA service worker (`registerType: autoUpdate`) serves the OLD build
+on the first load; it fetches the new one in the background and applies it on the NEXT
+load. So a deployed change takes two page loads to appear -- not a bug.
+
 ## Current state (one sentence; date it)
 
 2026-06-16: Phase 6 -- narrative Threads engine shipped (deployed live). A Thread is a curated, ordered, tiered reading-list over existing concepts, cutting vertically through eras the way you'd walk someone through a country's history (vs Era Lens, a horizontal slice). Skeleton-first: the thread session introduces tier-1 anchors before tier-2/3 detail, walks members chronologically, due reviews first. "Story" is now the default home tab; first thread "The short twentieth century" spans 18 existing 20th-century concepts (WWI to the EU). Schema at Dexie v3 (Thread table, ThreadMember, Concept.threads multiEntry); BANK_VERSION v5. NEXT (content phase): author the Slovak / Central-European anchors (Great Moravia, Austria-Hungary, Czechoslovakia 1918, 1968, 1989, 1993 split) as their own concepts + thread; later, a dedicated vertical-timeline thread screen and FSRS-stability-gated tier unlock.
