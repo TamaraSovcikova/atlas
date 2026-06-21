@@ -3,6 +3,7 @@ import { SessionView } from './SessionView'
 import { SettingsView } from './SettingsView'
 import { ConstellationScreen } from './ConstellationScreen'
 import { StatsView } from './StatsView'
+import { PathwayView } from './PathwayView'
 import type { Domain } from '../db/schema'
 
 type Mode =
@@ -10,6 +11,7 @@ type Mode =
   | { kind: 'settings' }
   | { kind: 'constellation' }
   | { kind: 'stats' }
+  | { kind: 'pathway' }
   | { kind: 'session'; shape: 'era'; eraId: string }
   | { kind: 'session'; shape: 'domain'; domain: Domain }
   | { kind: 'session'; shape: 'thread'; threadId: string }
@@ -34,6 +36,15 @@ export function DailySession({ mode, setMode }: Props) {
     return <StatsView onClose={() => setMode({ kind: 'home' })} />
   }
 
+  if (mode.kind === 'pathway') {
+    return (
+      <PathwayView
+        onClose={() => setMode({ kind: 'home' })}
+        onStartThread={(threadId) => setMode({ kind: 'session', shape: 'thread', threadId })}
+      />
+    )
+  }
+
   if (mode.kind === 'session') {
     return (
       <SessionView
@@ -56,6 +67,7 @@ export function DailySession({ mode, setMode }: Props) {
       onStartSpaced={() => setMode({ kind: 'session', shape: 'spaced' })}
       onOpenConstellation={() => setMode({ kind: 'constellation' })}
       onOpenStats={() => setMode({ kind: 'stats' })}
+      onOpenPathway={() => setMode({ kind: 'pathway' })}
     />
   )
 }
