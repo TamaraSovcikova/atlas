@@ -1,0 +1,9 @@
+name = "atlas-sync"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "atlas-sync"
+database_id = "c72c650a-66bd-4622-9d3f-3e6d7bb559a9"

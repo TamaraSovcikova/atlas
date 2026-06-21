@@ -36,6 +36,7 @@ interface Props {
   onStartSpaced: () => void
   onOpenConstellation: () => void
   onOpenStats: () => void
+  onOpenPathway: () => void
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -48,6 +49,7 @@ export function HomeView({
   onStartSpaced,
   onOpenConstellation,
   onOpenStats,
+  onOpenPathway,
 }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [shape, setShape] = useState<Shape>('thread')
@@ -164,6 +166,40 @@ export function HomeView({
           {snapshot.todayCards > 0 ? 'Continue today' : 'Begin today'}
         </Button>
       </div>
+
+      {/* Pathway strip -- where you are on the guided climb */}
+      {(() => {
+        const current = threadSummaries.find((t) => !(t.total > 0 && t.met === t.total))
+        const completed = threadSummaries.filter((t) => t.total > 0 && t.met === t.total).length
+        if (threadSummaries.length === 0) return null
+        return (
+          <button
+            type="button"
+            onClick={onOpenPathway}
+            className="group flex w-full items-center gap-4 rounded-2xl border border-white/[0.07] bg-bg-soft/50 p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99]"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 19h14M7 19V9l5-4 5 4v10" />
+                <circle cx="12" cy="11" r="1.5" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] uppercase tracking-wide text-ink-softer">
+                Your pathway · {completed}/{threadSummaries.length} stories
+              </span>
+              <span className="block truncate text-sm font-medium text-ink">
+                {current ? current.name : 'All stories complete'}
+              </span>
+            </span>
+            <span className="text-ink-softer transition-transform group-hover:translate-x-0.5">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </span>
+          </button>
+        )
+      })()}
 
       {/* Mastery spread bar */}
       {spread.total > 0 && (

@@ -1,7 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../store/useSettings'
 import { INTENSITY_LABEL, GOAL_OPTIONS, type Intensity } from '../lib/settings'
 import { downloadBackup, importBackup } from '../lib/backup'
+import {
+  ensureSyncToken,
+  getSyncToken,
+  setSyncToken,
+  generateToken,
+  getLastSyncedAt,
+  pushToCloud,
+  pullFromCloud,
+} from '../lib/sync'
 
 interface Props {
   onClose: () => void
@@ -15,6 +24,17 @@ export function SettingsView({ onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [backupMsg, setBackupMsg] = useState<string | null>(null)
 
+  const [token, setToken] = useState('')
+  const [revealToken, setRevealToken] = useState(false)
+  const [lastSynced, setLastSynced] = useState<number | null>(null)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    getSyncToken().then((t) => setToken(t ?? ''))
+    getLastSyncedAt().then(setLastSynced)
+  }, [])
+
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -23,6 +43,44 @@ export function SettingsView({ onClose }: Props) {
     const result = await importBackup(text)
     setBackupMsg(result.message)
     if (result.ok) setTimeout(() => window.location.reload(), 800)
+  }
+
+  async function onPush() {
+    setBusy(true)
+    setSyncMsg('Backing up…')
+    await ensureSyncToken()
+    const t = await getSyncToken()
+    setToken(t ?? '')
+    const res = await pushToCloud()
+    setSyncMsg(res.message)
+    setLastSynced(await getLastSyncedAt())
+    setBusy(false)
+  }
+
+  async function onPull() {
+    setBusy(true)
+    setSyncMsg('Pulling…')
+    const res = await pullFromCloud()
+    setSyncMsg(res.message)
+    if (res.ok) setTimeout(() => window.location.reload(), 900)
+    else setBusy(false)
+  }
+
+  async function onSaveToken() {
+    const t = token.trim()
+    if (t.length < 16) {
+      setSyncMsg('A sync token needs to be at least 16 characters.')
+      return
+    }
+    await setSyncToken(t)
+    setSyncMsg('Token saved on this device.')
+  }
+
+  async function onRegenerate() {
+    const t = generateToken()
+    await setSyncToken(t)
+    setToken(t)
+    setSyncMsg('New token generated. Push to start a fresh cloud backup.')
   }
 
   return (
@@ -168,6 +226,84 @@ export function SettingsView({ onClose }: Props) {
           className="hidden"
         />
         {backupMsg && <p className="text-xs text-accent">{backupMsg}</p>}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Cloud sync</h3>
+        <p className="text-xs text-ink-softer">
+          No login. Your sync token <em>is</em> your account — keep it secret and reuse it on another
+          device to pull your progress. Pulling replaces local data with the cloud copy.
+        </p>
+
+        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 p-3">
+          <div className="flex items-center gap-2">
+            <input
+              type={revealToken ? 'text' : 'password'}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="No token yet — push to create one"
+              className="min-w-0 flex-1 rounded-lg border border-bg-softer/40 bg-bg px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-softer/60 focus:border-accent focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setRevealToken((r) => !r)}
+              className="shrink-0 rounded-lg border border-bg-softer/40 px-2 py-2 text-[11px] text-ink-softer hover:text-ink"
+            >
+              {revealToken ? 'hide' : 'show'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (token) navigator.clipboard?.writeText(token)
+                setSyncMsg('Token copied.')
+              }}
+              className="shrink-0 rounded-lg border border-bg-softer/40 px-2 py-2 text-[11px] text-ink-softer hover:text-ink"
+            >
+              copy
+            </button>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onSaveToken}
+              className="rounded-lg border border-bg-softer/40 px-3 py-1.5 text-[11px] text-ink-soft hover:border-accent/40"
+            >
+              Save token
+            </button>
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="rounded-lg border border-bg-softer/40 px-3 py-1.5 text-[11px] text-ink-soft hover:border-accent/40"
+            >
+              Generate new
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onPush}
+            className="rounded-2xl border border-accent/40 bg-accent/10 py-3 text-sm text-accent transition-colors hover:bg-accent/15 disabled:opacity-50"
+          >
+            Push to cloud
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onPull}
+            className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 py-3 text-sm text-ink transition-colors hover:border-accent/40 disabled:opacity-50"
+          >
+            Pull from cloud
+          </button>
+        </div>
+        {lastSynced && (
+          <p className="text-[11px] text-ink-softer">
+            Last synced {new Date(lastSynced).toLocaleString()}
+          </p>
+        )}
+        {syncMsg && <p className="text-xs text-accent">{syncMsg}</p>}
       </div>
     </section>
   )

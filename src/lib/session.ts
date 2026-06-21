@@ -9,6 +9,7 @@ import {
 } from '../db/schema'
 import { shouldShowMcqFallback } from './fsrs'
 import { resolvePolicy, type Policy, type Prefs } from './settings'
+import { masteryOf, masterySpread, type MasteryLevel } from './mastery'
 
 export interface RecallItem {
   kind: 'recall'
@@ -735,6 +736,8 @@ export interface ThreadSummary {
   lockedNew: number
   met: number
   total: number
+  /** Mean mastery (0..1) across the thread's members. */
+  masteryFraction: number
 }
 
 export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[]> {
@@ -755,7 +758,9 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
       lockedNew: 0,
       met: 0,
       total: 0,
+      masteryFraction: 0,
     }
+    const levels: MasteryLevel[] = []
     for (const m of t.members) {
       const concept = conceptById.get(m.conceptId)
       if (!concept) continue
@@ -768,7 +773,9 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
       }
       const review = reviewByConcept.get(m.conceptId)
       if (review && review.dueAt <= now && concept.firstSeenAt !== null) summary.due++
+      levels.push(masteryOf(review, concept.firstSeenAt !== null))
     }
+    summary.masteryFraction = masterySpread(levels).fraction
     return summary
   })
 }
