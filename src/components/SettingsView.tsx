@@ -1,5 +1,7 @@
+import { useRef, useState } from 'react'
 import { useSettings } from '../store/useSettings'
-import { INTENSITY_LABEL, type Intensity } from '../lib/settings'
+import { INTENSITY_LABEL, GOAL_OPTIONS, type Intensity } from '../lib/settings'
+import { downloadBackup, importBackup } from '../lib/backup'
 
 interface Props {
   onClose: () => void
@@ -10,6 +12,18 @@ const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 export function SettingsView({ onClose }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const update = useSettings((s) => s.update)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [backupMsg, setBackupMsg] = useState<string | null>(null)
+
+  async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBackupMsg('Restoring…')
+    const text = await file.text()
+    const result = await importBackup(text)
+    setBackupMsg(result.message)
+    if (result.ok) setTimeout(() => window.location.reload(), 800)
+  }
 
   return (
     <section className="space-y-8">
@@ -18,6 +32,39 @@ export function SettingsView({ onClose }: Props) {
         <button type="button" onClick={onClose} className="text-sm text-ink-softer hover:text-ink">
           Done
         </button>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Daily goal</h3>
+        <p className="text-xs text-ink-softer">
+          Cards a day that count as done and keep your streak alive.
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {GOAL_OPTIONS.map((g) => {
+            const active = prefs.dailyGoalCards === g
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => update({ dailyGoalCards: g })}
+                className={`rounded-2xl border py-3 text-center transition-colors ${
+                  active
+                    ? 'border-accent/70 bg-accent/10 text-accent'
+                    : 'border-bg-softer/40 bg-bg-soft/50 text-ink hover:border-accent/40'
+                }`}
+              >
+                <span className="block text-lg font-semibold tabular-nums">{g}</span>
+                <span className="block text-[10px] uppercase tracking-wide text-ink-softer">
+                  cards
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-xs text-ink-softer">
+          🛡️ {prefs.streakFreezes} streak freeze{prefs.streakFreezes === 1 ? '' : 's'} in reserve —
+          they bridge a missed day so one gap doesn't reset your streak.
+        </p>
       </div>
 
       <div className="space-y-3">
@@ -89,6 +136,38 @@ export function SettingsView({ onClose }: Props) {
           value={prefs.enableContrast}
           onChange={(v) => update({ enableContrast: v })}
         />
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Backup</h3>
+        <p className="text-xs text-ink-softer">
+          Your progress lives in this browser. Export a file to keep it safe or move it to another
+          device. Importing replaces everything here with the backup.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => downloadBackup()}
+            className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 py-3 text-sm text-ink transition-colors hover:border-accent/40"
+          >
+            Export backup
+          </button>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 py-3 text-sm text-ink transition-colors hover:border-accent/40"
+          >
+            Import backup
+          </button>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={onImportFile}
+          className="hidden"
+        />
+        {backupMsg && <p className="text-xs text-accent">{backupMsg}</p>}
       </div>
     </section>
   )
