@@ -24,7 +24,7 @@ export type Region = 'uk' | 'slovak_eu' | 'world'
 
 export type RecallFormat = 'cloze' | 'cloze_chips' | 'contrast' | 'free' | 'map'
 
-export type SessionShape = 'era' | 'domain' | 'spaced' | 'thread'
+export type SessionShape = 'era' | 'domain' | 'spaced' | 'thread' | 'daily'
 
 export interface Era {
   id: string

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  buildDailySession,
   buildDomainSession,
   buildEraSession,
   buildSpacedSession,
@@ -20,7 +21,7 @@ import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
 
 interface Props {
-  shape: 'era' | 'domain' | 'spaced' | 'thread'
+  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily'
   eraId: string | null
   domain: Domain | null
   threadId: string | null
@@ -78,7 +79,9 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     let cancelled = false
     async function load() {
       let p: SessionPlan
-      if (shape === 'era' && eraId) {
+      if (shape === 'daily') {
+        p = await buildDailySession(prefs)
+      } else if (shape === 'era' && eraId) {
         p = await buildEraSession(eraId, prefs)
         const e = await db.eras.get(eraId)
         if (!cancelled && e) setEra(e)
@@ -269,6 +272,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
               <span className="text-ink-soft">{threadName}</span>
             )}
             {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
+            {shape === 'daily' && <span className="text-ink-soft">Today</span>}
             <span className="ml-3">
               {index + 1} of {plan.items.length}
             </span>

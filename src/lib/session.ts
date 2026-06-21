@@ -513,6 +513,103 @@ export async function buildSpacedSession(
 }
 
 /**
+ * The Spine: one composed daily session, so "Begin today" never makes the user
+ * choose a shape. Due reviews across the whole graph come first, then a small
+ * number of new concepts drawn from the narrative threads in pathway order
+ * (tier-gated, skeleton before detail), falling back to chronological new
+ * concepts if the threads have nothing unlocked. The result is interleaved by
+ * domain and games are injected, exactly like the other shapes.
+ */
+export async function buildDailySession(
+  prefs: Prefs,
+  now = Date.now(),
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const policy = resolvePolicy(prefs)
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+  const maxNew = options.maxNew ?? 4
+
+  const allConcepts = await db.concepts.toArray()
+  const conceptById = new Map(allConcepts.map((c) => [c.id, c]))
+  const allReviews = await db.reviews.toArray()
+  const reviewByConcept = new Map(allReviews.map((r) => [r.conceptId, r]))
+
+  const recall: RecallItem[] = []
+  const usedIds = new Set<string>()
+  let rot = 0
+
+  // 1. Due reviews across everything (already-seen concepts only).
+  const due = allReviews
+    .filter((r) => r.dueAt <= now)
+    .sort((a, b) => a.dueAt - b.dueAt)
+  for (const review of due) {
+    const concept = conceptById.get(review.conceptId)
+    if (!concept || concept.firstSeenAt === null) continue
+    if (usedIds.has(concept.id)) continue
+    const item = await makeRecallItem(concept, review, false, policy, 'review', rot++)
+    if (item) {
+      recall.push(item)
+      usedIds.add(concept.id)
+    }
+  }
+
+  // 2. New concepts from threads in pathway (displayOrder), tier-gated.
+  const threads = await db.threads.orderBy('displayOrder').toArray()
+  const newItems: RecallItem[] = []
+  for (const thread of threads) {
+    if (newItems.length >= maxNew) break
+    const unlocked = computeUnlockedTiers(thread.members, conceptById, reviewByConcept)
+    const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
+    const fresh = thread.members
+      .map((m) => conceptById.get(m.conceptId))
+      .filter(
+        (c): c is Concept =>
+          !!c &&
+          c.firstSeenAt === null &&
+          !usedIds.has(c.id) &&
+          unlocked.has(tierByConcept.get(c.id) ?? 1),
+      )
+      .sort((a, b) => {
+        const ta = tierByConcept.get(a.id) ?? 1
+        const tb = tierByConcept.get(b.id) ?? 1
+        if (ta !== tb) return ta - tb
+        return (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity)
+      })
+    for (const concept of fresh) {
+      if (newItems.length >= maxNew) break
+      const review = reviewByConcept.get(concept.id)
+      if (!review) continue
+      const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
+      if (item) {
+        newItems.push(item)
+        usedIds.add(concept.id)
+      }
+    }
+  }
+
+  // 3. Fallback: chronological new from anywhere, if threads gave too few.
+  if (newItems.length < maxNew) {
+    const chrono = allConcepts
+      .filter((c) => c.firstSeenAt === null && !usedIds.has(c.id))
+      .sort((a, b) => (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity))
+    for (const concept of chrono) {
+      if (newItems.length >= maxNew) break
+      const review = reviewByConcept.get(concept.id)
+      if (!review) continue
+      const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
+      if (item) {
+        newItems.push(item)
+        usedIds.add(concept.id)
+      }
+    }
+  }
+
+  const combined = [...recall, ...newItems].slice(0, maxCards)
+  const items = injectGames(combined, policy)
+  return countPlan(items, 'daily', null, null)
+}
+
+/**
  * Walk a narrative thread. Due reviews from the thread come first; new concepts
  * are introduced tier-ascending then chronologically, so the skeleton (tier-1
  * anchors) is taught before the detail (tiers 2-3) that fills in between them.
