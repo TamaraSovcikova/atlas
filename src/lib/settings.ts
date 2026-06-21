@@ -9,6 +9,10 @@ export interface Prefs {
   enableMap: boolean
   enableContrast: boolean
   showConstellationReveal: boolean
+  /** Cards per day that count as "goal met" and extend the streak. */
+  dailyGoalCards: number
+  /** Streak freezes available to bridge isolated missed days. */
+  streakFreezes: number
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -19,7 +23,11 @@ export const DEFAULT_PREFS: Prefs = {
   enableMap: true,
   enableContrast: true,
   showConstellationReveal: true,
+  dailyGoalCards: 12,
+  streakFreezes: 2,
 }
+
+export const GOAL_OPTIONS = [6, 12, 20, 30] as const
 
 export interface Policy {
   // true => tap-the-chip cloze; false => typed cloze

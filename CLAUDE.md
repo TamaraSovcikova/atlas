@@ -40,7 +40,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 ## Current state
 
-2026-06-19: FSRS-stability-gated tier unlock shipped (TIER_STABILITY_GATE=7 days in session.ts; tier-2/3 new concepts blocked until tier-1 anchors reach stability threshold; HomeView shows "locked" pill). Previously: SwipeRatingZone, ConceptRabbitHole, 55svh fix. BANK_VERSION v7. NEXT: Daylight theme; verify Wikimedia imageUrl filenames.
+2026-06-21: "The Spine" rework on branch `rework/the-spine` (Phases 0,1,2,4,5). Captured Session.accuracy (was null). New `lib/mastery.ts` (bands derived from FSRS stability) + `lib/progress.ts` (streak/goal/freezes) + `buildDailySession()` composer (shape `daily`). HomeView rebuilt around "Begin today" + progress header + Explore drawer. `StatsView` (heatmap/retention/mastery). `lib/backup.ts` JSON export/import + Settings daily-goal picker. Streak celebration on complete. BANK_VERSION v8, 34 tests. Decisions: tasteful gamification, accounts = backup+token sync (no login). NEXT: merge to main + deploy; Phase 3 pathway map; Phase 4b Cloudflare token sync. Animation overhaul + 457-concept content also shipped (on main).
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 

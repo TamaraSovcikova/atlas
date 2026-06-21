@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { progressSnapshot } from '../lib/progress'
 import {
+  buildDailySession,
   buildDomainSession,
   buildEraSession,
   buildSpacedSession,
@@ -20,7 +23,7 @@ import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
 
 interface Props {
-  shape: 'era' | 'domain' | 'spaced' | 'thread'
+  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily'
   eraId: string | null
   domain: Domain | null
   threadId: string | null
@@ -73,12 +76,15 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const [revealedRating, setRevealedRating] = useState<RecallRating | null | undefined>(undefined)
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
   const [swipeDir, setSwipeDir] = useState<SwipeDir>(null)
+  const allSessions = useLiveQuery(() => db.sessions.toArray(), [], [])
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       let p: SessionPlan
-      if (shape === 'era' && eraId) {
+      if (shape === 'daily') {
+        p = await buildDailySession(prefs)
+      } else if (shape === 'era' && eraId) {
         p = await buildEraSession(eraId, prefs)
         const e = await db.eras.get(eraId)
         if (!cancelled && e) setEra(e)
@@ -182,6 +188,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         : ratings.filter((r) => r !== 'again').length / ratings.length
     const great = accuracy !== null && accuracy >= 0.8
     const pct = accuracy !== null ? Math.round(accuracy * 100) : null
+    const snap = progressSnapshot(allSessions, prefs.dailyGoalCards, prefs.streakFreezes)
     return (
       <M.section
         initial={{ opacity: 0, y: 16 }}
@@ -233,10 +240,26 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
             )}
           </M.div>
         )}
+        {plan.items.length > 0 && snap.streak > 0 && (
+          <M.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.32 }}
+            className="mt-5 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5"
+          >
+            <span className="text-base">🔥</span>
+            <span className="text-sm font-medium text-accent">
+              {snap.streak} day streak
+            </span>
+            {snap.goalMet && (
+              <span className="text-[11px] text-ink-soft">· today's goal met</span>
+            )}
+          </M.div>
+        )}
         <M.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ ...ease, delay: 0.28 }}
+          transition={{ ...ease, delay: 0.4 }}
         >
           <Button onClick={onFinished} className="mt-8">
             Back to home
@@ -269,6 +292,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
               <span className="text-ink-soft">{threadName}</span>
             )}
             {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
+            {shape === 'daily' && <span className="text-ink-soft">Today</span>}
             <span className="ml-3">
               {index + 1} of {plan.items.length}
             </span>
