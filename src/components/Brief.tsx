@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Concept } from '../db/schema'
 import { LinkedText } from './LinkedText'
 
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
+  const [imgLoaded, setImgLoaded] = useState(false)
   const tone =
     variant === 'intro'
       ? 'border-accent/30 bg-accent/5'
@@ -23,7 +25,9 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           <img
             src={concept.imageUrl}
             alt={concept.name}
-            className="h-36 w-full object-cover"
+            className="h-36 w-full object-cover transition-opacity duration-500"
+            style={{ opacity: imgLoaded ? 1 : 0 }}
+            onLoad={() => setImgLoaded(true)}
             onError={(e) => {
               const el = e.currentTarget.parentElement
               if (el) el.style.display = 'none'

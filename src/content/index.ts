@@ -6,12 +6,19 @@ import { EARLY_MODERN } from './bank/earlyModern'
 import { INDUSTRIAL } from './bank/industrial'
 import { CONTEMPORARY } from './bank/contemporary'
 import { SLOVAK } from './bank/slovak'
+import { ANCIENT_EXPANDED } from './bank/ancient-expanded'
+import { CLASSICAL_EXPANDED } from './bank/classical-expanded'
+import { MEDIEVAL_EXPANDED } from './bank/medieval-expanded'
+import { RENAISSANCE_EXPANDED } from './bank/renaissance-expanded'
+import { INDUSTRIAL_EXPANDED } from './bank/industrial-expanded'
+import { WORLDWARS_EXPANDED } from './bank/worldwars-expanded'
+import { COLDWAR_EXPANDED } from './bank/coldwar-expanded'
 
 /**
  * Bump when the bank content changes so the loader re-syncs it into Dexie.
  * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
  */
-export const BANK_VERSION = 'v7'
+export const BANK_VERSION = 'v8'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,
@@ -19,6 +26,13 @@ export const BANK_CONCEPTS: BankConcept[] = [
   ...INDUSTRIAL,
   ...CONTEMPORARY,
   ...SLOVAK,
+  ...ANCIENT_EXPANDED,
+  ...CLASSICAL_EXPANDED,
+  ...MEDIEVAL_EXPANDED,
+  ...RENAISSANCE_EXPANDED,
+  ...INDUSTRIAL_EXPANDED,
+  ...WORLDWARS_EXPANDED,
+  ...COLDWAR_EXPANDED,
 ]
 
 export const BANK_ERAS: BankEra[] = ERAS

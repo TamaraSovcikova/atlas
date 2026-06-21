@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { RecallItem } from '../../lib/session'
 import type { RecallRating } from '../../lib/fsrs'
 import { Brief } from '../Brief'
+import { M, AnimatePresence } from '../ui/motion'
 
 interface Props {
   item: RecallItem
@@ -19,12 +20,22 @@ function shuffle<T>(arr: T[]): T[] {
   return out
 }
 
+const listContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+}
+const listItem = {
+  hidden: { opacity: 0, x: -10 },
+  show: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 380, damping: 28 } },
+}
+
 export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: Props) {
   const { concept, question } = item
   const correct = question.expectedAnswer
   const distractors = question.distractors ?? []
   const options = useMemo(
     () => shuffle([correct, ...distractors]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [item.cardKey, correct, distractors],
   )
   const [picked, setPicked] = useState<string | null>(null)
@@ -60,7 +71,13 @@ export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: P
       </header>
       {showBrief && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
       <p className="text-lg text-ink">{question.prompt}</p>
-      <ul className="space-y-2">
+      <M.ul
+        key={item.cardKey}
+        variants={listContainer}
+        initial="hidden"
+        animate="show"
+        className="space-y-2"
+      >
         {options.map((opt) => {
           const isCorrect = opt === correct
           const isPicked = picked === opt
@@ -72,26 +89,46 @@ export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: P
                 ? 'border-red-500/40 bg-red-500/10 text-ink-soft'
                 : 'border-bg-softer/40 bg-bg-soft text-ink-softer'
             : 'border-bg-softer/40 bg-bg-soft text-ink hover:border-accent/50 hover:bg-accent/5'
+          const anim =
+            reveal && isPicked
+              ? isCorrect
+                ? 'animate-pop'
+                : 'animate-shake'
+              : ''
           return (
-            <li key={opt}>
+            <M.li key={opt} variants={listItem}>
               <button
                 type="button"
                 onClick={() => pick(opt)}
                 disabled={picked !== null}
-                className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${tone}`}
+                className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${tone} ${anim}`}
               >
-                {opt}
+                <span className="flex items-center justify-between gap-2">
+                  {opt}
+                  {reveal && isCorrect && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="shrink-0 text-accent animate-bloom">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
+                </span>
               </button>
-            </li>
+            </M.li>
           )
         })}
-      </ul>
-      {picked !== null && (
-        <p className="text-sm text-ink-soft">
-          {gotIt ? 'Yes. ' : 'Not yet. '}
-          <span className="text-accent">{correct}</span>.
-        </p>
-      )}
+      </M.ul>
+      <AnimatePresence>
+        {picked !== null && (
+          <M.p
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="text-sm text-ink-soft"
+          >
+            {gotIt ? 'Yes. ' : 'Not yet. '}
+            <span className="text-accent">{correct}</span>.
+          </M.p>
+        )}
+      </AnimatePresence>
     </article>
   )
 }

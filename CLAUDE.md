@@ -40,7 +40,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 ## Current state
 
-2026-06-19: SwipeRatingZone (swipe left = See again, right = Got it), ConceptRabbitHole rabbit-hole drawer, 55svh overflow fix shipped + deployed. BANK_VERSION v7 (Slovak thread + 9 concepts + images on 19 concepts). NEXT: FSRS-stability-gated tier unlock; Daylight theme.
+2026-06-19: FSRS-stability-gated tier unlock shipped (TIER_STABILITY_GATE=7 days in session.ts; tier-2/3 new concepts blocked until tier-1 anchors reach stability threshold; HomeView shows "locked" pill). Previously: SwipeRatingZone, ConceptRabbitHole, 55svh fix. BANK_VERSION v7. NEXT: Daylight theme; verify Wikimedia imageUrl filenames.
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 

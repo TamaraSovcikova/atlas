@@ -1,0 +1,655 @@
+import type { BankConcept } from '../types'
+
+export const RENAISSANCE_EXPANDED: BankConcept[] = [
+  // ── Italian Renaissance ──────────────────────────────────────────────────
+  {
+    id: 'medici-family',
+    name: 'The Medici Family',
+    domain: 'history',
+    approxYear: 1450,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'A Florentine banking dynasty who became the most powerful patrons of the Italian Renaissance, funding Botticelli, Leonardo da Vinci, and Michelangelo. Three Medici became popes and two became queens of France, making them the most influential family in 15th-century Europe. Their palace and the Uffizi gallery they built still anchor Florence today.',
+    wikipedia: 'https://en.wikipedia.org/wiki/House_of_Medici',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Medici were a Florentine ____ dynasty who bankrolled the Italian Renaissance.', answer: 'banking' },
+      { format: 'contrast', prompt: 'Which city did the Medici transform into the Renaissance capital of Europe?', answer: 'Florence', distractors: ['Venice', 'Rome', 'Milan'] },
+    ],
+    edges: [
+      { to: 'the-renaissance', relation: 'caused' },
+      { to: 'leonardo-da-vinci', relation: 'influenced_by' },
+      { to: 'michelangelo', relation: 'influenced_by' },
+    ],
+  },
+  {
+    id: 'michelangelo',
+    name: 'Michelangelo',
+    domain: 'culture',
+    approxYear: 1512,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'A Florentine sculptor, painter, and architect who produced two of the most celebrated works in Western art: the marble statue David (1504) and the ceiling of the Sistine Chapel (1508–1512). He spent four years painting the chapel ceiling while lying on scaffolding, covering it with 300 figures including the iconic image of God reaching toward Adam. Pope Julius II called him "the divine one".',
+    wikipedia: 'https://en.wikipedia.org/wiki/Michelangelo',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Michelangelo spent four years painting the ceiling of the ____ Chapel.', answer: 'Sistine' },
+      { format: 'contrast', prompt: 'Which marble statue did Michelangelo complete in 1504?', answer: 'David', distractors: ['Moses', 'Pietà', 'Apollo'] },
+    ],
+    edges: [
+      { to: 'the-renaissance', relation: 'part_of' },
+      { to: 'medici-family', relation: 'influenced_by' },
+    ],
+  },
+  {
+    id: 'raphael',
+    name: 'Raphael',
+    domain: 'culture',
+    approxYear: 1510,
+    eras: ['renaissance'],
+    lat: 41.9,
+    lng: 12.5,
+    summary:
+      'An Italian painter who created some of the most harmonious compositions of the High Renaissance, most famously The School of Athens (1511) — a fresco depicting ancient philosophers including Plato and Aristotle gathered in an imaginary classical hall. Pope Julius II hired him to decorate the Vatican\'s papal apartments alongside Michelangelo. He died at 37, and contemporaries called him the "prince of painters".',
+    wikipedia: 'https://en.wikipedia.org/wiki/Raphael',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: "Raphael's fresco The School of ____ depicts ancient philosophers in an idealized classical hall.", answer: 'Athens' },
+      { format: 'contrast', prompt: 'At what age did Raphael die, cutting short one of the Renaissance\'s greatest careers?', answer: '37', distractors: ['52', '44', '61'] },
+    ],
+    edges: [{ to: 'the-renaissance', relation: 'part_of' }],
+  },
+  {
+    id: 'botticelli',
+    name: 'Sandro Botticelli',
+    domain: 'culture',
+    approxYear: 1485,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'A Florentine painter best known for The Birth of Venus (c. 1485) and Primavera, both commissioned by the Medici family. His graceful, linear style and mythological subjects mark him as the defining painter of the Florentine Early Renaissance. After Savonarola\'s "Bonfire of the Vanities" in 1497, Botticelli reportedly burned some of his own secular works.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Sandro_Botticelli',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Botticelli painted The Birth of ____, commissioned by the Medici family around 1485.', answer: 'Venus' },
+    ],
+    edges: [
+      { to: 'medici-family', relation: 'influenced_by' },
+      { to: 'the-renaissance', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'brunelleschi-dome',
+    name: "Brunelleschi's Dome",
+    domain: 'culture',
+    approxYear: 1436,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      "Filippo Brunelleschi's dome for Florence Cathedral (Santa Maria del Fiore), completed in 1436, was the largest masonry dome built since the Pantheon in Rome — and no one knew how to build one that large. Brunelleschi invented new hoisting machines and a double-shell brick technique to do it without scaffolding. It remains the largest brick dome ever constructed.",
+    wikipedia: 'https://en.wikipedia.org/wiki/Florence_Cathedral',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: "Brunelleschi's dome for Florence Cathedral was completed in ____ and remains the largest brick dome ever built.", answer: '1436' },
+      { format: 'contrast', prompt: 'What was revolutionary about how Brunelleschi built his dome?', answer: 'No scaffolding — a new double-shell brick technique', distractors: ['Flying buttresses from outside', 'A wooden frame that was later removed', 'Iron reinforcement rods'] },
+    ],
+    edges: [{ to: 'the-renaissance', relation: 'part_of' }],
+  },
+  {
+    id: 'humanism',
+    name: 'Renaissance Humanism',
+    domain: 'culture',
+    approxYear: 1400,
+    eras: ['renaissance'],
+    summary:
+      'An intellectual movement at the heart of the Renaissance that placed human beings — their reason, dignity, and potential — at the centre of study, shifting focus away from medieval theology toward classical Greek and Roman texts. Humanists like Petrarch, Erasmus, and Pico della Mirandola championed the idea that humans could improve themselves through education and virtue. It laid the groundwork for both the Reformation and the Scientific Revolution.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Renaissance_humanism',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Renaissance humanism shifted intellectual focus from medieval theology toward classical ____ and Roman texts.', answer: 'Greek' },
+      { format: 'contrast', prompt: 'Which thinker is considered the first Renaissance humanist, reviving interest in classical Latin?', answer: 'Petrarch', distractors: ['Erasmus', 'Thomas More', 'Pico della Mirandola'] },
+    ],
+    edges: [
+      { to: 'the-renaissance', relation: 'part_of' },
+      { to: 'scientific-revolution', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'machiavelli',
+    name: 'Machiavelli and The Prince',
+    domain: 'politics',
+    approxYear: 1513,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'Niccolò Machiavelli was a Florentine diplomat who wrote The Prince (1513), a manual of political power arguing that a ruler must be willing to use deception and force to maintain the state — that it is better to be feared than loved. Written after the Medici restored power and imprisoned Machiavelli, it was the first work of modern political science to separate ethics from politics. "Machiavellian" entered the language as a byword for cunning ruthlessness.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Niccol%C3%B2_Machiavelli',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Machiavelli argued in The Prince that it is better for a ruler to be ____ than loved.', answer: 'feared' },
+      { format: 'contrast', prompt: 'What made The Prince revolutionary in political thought?', answer: 'It separated ethics from politics for the first time', distractors: ['It argued for democracy over monarchy', 'It applied mathematics to statecraft', 'It advocated for religious authority over rulers'] },
+    ],
+    edges: [{ to: 'medici-family', relation: 'influenced_by' }],
+  },
+  {
+    id: 'erasmus',
+    name: 'Erasmus of Rotterdam',
+    domain: 'culture',
+    approxYear: 1511,
+    eras: ['renaissance'],
+    summary:
+      'The leading humanist scholar of Northern Europe, who edited the Greek New Testament and wrote The Praise of Folly (1511) — a satirical attack on the corruption of the Catholic Church. He corresponded with every major thinker in Europe and championed church reform, but refused to break with Rome as Luther did, trying to reform from within. The Jesuits and Protestant reformers both claimed his ideas as their own.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Erasmus',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Erasmus wrote The Praise of ____, a satire attacking corruption in the Catholic Church.', answer: 'Folly' },
+      { format: 'contrast', prompt: 'What distinguished Erasmus from Luther despite both criticising the Church?', answer: 'Erasmus refused to break with Rome; Luther did', distractors: ['Erasmus never criticised the Pope directly', 'Erasmus was a monk; Luther was a layman', 'Erasmus wrote in German; Luther in Latin'] },
+    ],
+    edges: [
+      { to: 'humanism', relation: 'part_of' },
+      { to: 'protestant-reformation', relation: 'influenced_by' },
+    ],
+  },
+  // ── The Americas ─────────────────────────────────────────────────────────
+  {
+    id: 'aztec-empire',
+    name: 'The Aztec Empire',
+    domain: 'history',
+    approxYear: 1430,
+    eras: ['renaissance'],
+    lat: 19.43,
+    lng: -99.13,
+    summary:
+      'A powerful Mesoamerican empire centred on the island city of Tenochtitlan (modern Mexico City), which by 1500 was larger than any European city. The Aztecs extracted tribute from conquered peoples across central Mexico and built a sophisticated civilisation with writing, astronomy, and monumental architecture including the Great Temple. The empire fell to Hernán Cortés and his indigenous allies in 1521.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Aztec_Empire',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Aztec Empire was centred on the island city of ____, now Mexico City.', answer: 'Tenochtitlan' },
+      { format: 'contrast', prompt: 'How did the Aztec Empire fall in 1521?', answer: 'Hernán Cortés and indigenous allies conquered it', distractors: ['Internal civil war destroyed it', 'European disease alone wiped out the population', 'It was absorbed peacefully into New Spain'] },
+    ],
+    edges: [
+      { to: 'hernan-cortes', relation: 'opposed' },
+      { to: 'columbian-exchange', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'inca-empire',
+    name: 'The Inca Empire',
+    domain: 'history',
+    approxYear: 1450,
+    eras: ['renaissance'],
+    lat: -13.16,
+    lng: -72.54,
+    summary:
+      'The largest pre-Columbian empire in the Americas, stretching 4,000 km along the Andes from modern Ecuador to Chile. The Inca had no writing system but administered their empire through an elaborate system of knotted strings called quipu and a road network of over 40,000 km. Machu Picchu, built around 1450, is the best-preserved example of their extraordinary stone architecture.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Inca_Empire',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Inca used knotted strings called ____ to record information in the absence of writing.', answer: 'quipu' },
+      { format: 'contrast', prompt: 'How far did the Inca Empire stretch along the Andes?', answer: '4,000 km from Ecuador to Chile', distractors: ['1,000 km across the Amazon basin', '2,000 km along the Pacific coast', '6,000 km from Mexico to Patagonia'] },
+    ],
+    edges: [
+      { to: 'francisco-pizarro', relation: 'opposed' },
+      { to: 'columbian-exchange', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'christopher-columbus',
+    name: 'Christopher Columbus',
+    domain: 'history',
+    approxYear: 1492,
+    eras: ['renaissance'],
+    lat: 24.0,
+    lng: -74.0,
+    summary:
+      'A Genoese navigator who sailed west from Spain in 1492 searching for a sea route to Asia and instead made landfall in the Caribbean — an event that permanently connected the Eastern and Western hemispheres. He made four voyages to the Americas and died still believing he had reached Asia. His arrival triggered the Columbian Exchange and the eventual colonisation of the Americas by European powers.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Christopher_Columbus',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Christopher Columbus reached the Caribbean in ____, sailing west from Spain.', answer: '1492' },
+      { format: 'contrast', prompt: 'What did Columbus believe he had reached when he landed in the Caribbean?', answer: 'Asia', distractors: ['A new continent', 'The Spice Islands', 'The coast of Africa'] },
+    ],
+    edges: [
+      { to: 'age-of-exploration', relation: 'part_of' },
+      { to: 'columbian-exchange', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'hernan-cortes',
+    name: 'Hernán Cortés',
+    domain: 'history',
+    approxYear: 1521,
+    eras: ['renaissance'],
+    lat: 19.43,
+    lng: -99.13,
+    summary:
+      'A Spanish conquistador who, with roughly 500 soldiers and key indigenous allies — particularly the Tlaxcalans who resented Aztec rule — overthrew the Aztec Empire in two years (1519–1521). His success was aided by smallpox, which devastated the Aztec population, and by Malinche, a bilingual indigenous woman who served as his interpreter and advisor. The conquest opened Mexico to Spanish colonisation.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Hern%C3%A1n_Cort%C3%A9s',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Cortés overthrew the Aztec Empire between 1519 and ____ with indigenous allies and devastating disease.', answer: '1521' },
+      { format: 'contrast', prompt: 'What gave Cortés his decisive military advantage over the Aztecs?', answer: 'Indigenous allies, smallpox, and horses', distractors: ['Superior artillery alone', 'Naval blockade of Tenochtitlan', 'A bribed Aztec emperor'] },
+    ],
+    edges: [
+      { to: 'aztec-empire', relation: 'opposed' },
+      { to: 'columbian-exchange', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'francisco-pizarro',
+    name: 'Francisco Pizarro',
+    domain: 'history',
+    approxYear: 1532,
+    eras: ['renaissance'],
+    lat: -13.16,
+    lng: -72.54,
+    summary:
+      'A Spanish conquistador who conquered the Inca Empire in 1532 with fewer than 200 soldiers by capturing the Inca emperor Atahualpa during a surprise attack at Cajamarca. Atahualpa offered a roomful of gold and two rooms of silver as ransom; Pizarro accepted the ransom then executed him anyway. The conquest gave Spain control of the richest silver deposits in the world at Potosí.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Francisco_Pizarro',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Pizarro captured the Inca emperor ____ at Cajamarca in 1532.', answer: 'Atahualpa' },
+      { format: 'contrast', prompt: 'How many soldiers did Pizarro use to conquer the Inca Empire?', answer: 'Fewer than 200', distractors: ['Around 2,000', 'Nearly 5,000', 'About 800'] },
+    ],
+    edges: [{ to: 'inca-empire', relation: 'opposed' }],
+  },
+  {
+    id: 'columbian-exchange',
+    name: 'The Columbian Exchange',
+    domain: 'history',
+    approxYear: 1500,
+    eras: ['renaissance'],
+    summary:
+      'The mass transfer of plants, animals, diseases, and people between the Americas and the Old World that followed Columbus\'s 1492 voyage. Europe received tomatoes, potatoes, maize, chocolate, and tobacco — crops that transformed diets and population growth. The Americas received smallpox, measles, and influenza, which killed an estimated 90% of the indigenous population within a century.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Columbian_exchange',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Old World diseases introduced via the Columbian Exchange killed an estimated ____% of the Americas\' indigenous population within a century.', answer: '90' },
+      { format: 'contrast', prompt: 'Which major European food staple came to Europe via the Columbian Exchange?', answer: 'The potato', distractors: ['Wheat', 'Rice', 'Barley'] },
+    ],
+    edges: [
+      { to: 'christopher-columbus', relation: 'successor_of' },
+      { to: 'age-of-exploration', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'atlantic-slave-trade',
+    name: 'The Atlantic Slave Trade',
+    domain: 'history',
+    approxYear: 1600,
+    eras: ['renaissance', 'enlightenment', 'revolution', 'long19c'],
+    summary:
+      'The forced transportation of approximately 12.5 million enslaved Africans across the Atlantic to the Americas between the 16th and 19th centuries, the largest forced migration in history. Enslaved people were traded along the "Triangular Trade" route: European goods to Africa, enslaved people to the Americas, and plantation products back to Europe. Around 1.8 million died on the Middle Passage alone.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Atlantic_slave_trade',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Approximately ____ million Africans were transported across the Atlantic in the slave trade.', answer: '12.5' },
+      { format: 'contrast', prompt: 'What name was given to the sea crossing from Africa to the Americas that enslaved people were forced to endure?', answer: 'The Middle Passage', distractors: ['The Triangular Route', 'The Western Crossing', 'The Trade Passage'] },
+    ],
+    edges: [
+      { to: 'age-of-exploration', relation: 'caused' },
+      { to: 'abolition-of-slavery', relation: 'opposed' },
+    ],
+  },
+  // ── Reformation ──────────────────────────────────────────────────────────
+  {
+    id: 'martin-luther',
+    name: 'Martin Luther',
+    domain: 'religions',
+    approxYear: 1517,
+    eras: ['renaissance'],
+    lat: 51.87,
+    lng: 12.64,
+    summary:
+      'A German monk who launched the Protestant Reformation in 1517 by nailing his 95 Theses to the door of a Wittenberg church, condemning the Catholic practice of selling indulgences. He was excommunicated by Pope Leo X but translated the Bible into German, making it accessible to ordinary people and standardising the German language. His teaching that salvation comes through faith alone — not works or Church authority — split Western Christianity permanently.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Martin_Luther',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Martin Luther nailed his 95 Theses to a church door in ____ in 1517.', answer: 'Wittenberg' },
+      { format: 'contrast', prompt: 'What was Luther\'s core theological argument that broke with Catholic teaching?', answer: 'Salvation comes through faith alone, not works or Church authority', distractors: ['The Pope had no authority over monarchs', 'All sacraments were invalid except baptism', 'The Bible should be burned and rewritten'] },
+    ],
+    edges: [
+      { to: 'protestant-reformation', relation: 'caused' },
+      { to: 'printing-press', relation: 'influenced_by' },
+    ],
+  },
+  {
+    id: 'henry-viii',
+    name: 'Henry VIII and the English Reformation',
+    domain: 'history',
+    approxYear: 1534,
+    eras: ['renaissance'],
+    lat: 51.5,
+    lng: -0.12,
+    summary:
+      'King Henry VIII broke England from the Catholic Church in 1534 not for theological reasons but to annul his marriage to Catherine of Aragon, whom he wanted to replace in hopes of a male heir. He dissolved the monasteries, seized their wealth, and made himself Supreme Head of the Church of England. His six marriages and the fates of his wives — two executed, two divorced, one died, one survived — became the most famous royal soap opera in history.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Henry_VIII',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Henry VIII broke with Rome in 1534 to annul his marriage to ____ of Aragon.', answer: 'Catherine' },
+      { format: 'contrast', prompt: 'What title did Henry VIII give himself after breaking from Rome?', answer: 'Supreme Head of the Church of England', distractors: ['Defender of the Protestant Faith', 'Papal Legate of England', 'Archbishop of Canterbury'] },
+    ],
+    edges: [
+      { to: 'protestant-reformation', relation: 'part_of' },
+      { to: 'council-of-trent', relation: 'opposed' },
+    ],
+  },
+  {
+    id: 'john-calvin',
+    name: 'John Calvin',
+    domain: 'religions',
+    approxYear: 1536,
+    eras: ['renaissance'],
+    lat: 46.2,
+    lng: 6.15,
+    summary:
+      'A French theologian who made Geneva into a model Protestant city and developed Calvinism — a form of Christianity emphasising predestination (God had already determined who would be saved) and rigorous moral discipline. His Institutes of the Christian Religion (1536) became the most systematic theological work of the Reformation. Calvinism spread to Scotland (as Presbyterianism), the Netherlands, and eventually the English Puritans who founded New England.',
+    wikipedia: 'https://en.wikipedia.org/wiki/John_Calvin',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'John Calvin\'s doctrine of ____ held that God had already decided who would be saved.', answer: 'predestination' },
+      { format: 'contrast', prompt: 'Which city did Calvin turn into a model Protestant theocracy?', answer: 'Geneva', distractors: ['Zurich', 'Wittenberg', 'Amsterdam'] },
+    ],
+    edges: [{ to: 'protestant-reformation', relation: 'part_of' }],
+  },
+  {
+    id: 'council-of-trent',
+    name: 'Council of Trent',
+    domain: 'religions',
+    approxYear: 1545,
+    eras: ['renaissance'],
+    lat: 46.07,
+    lng: 11.12,
+    summary:
+      'A 18-year series of Catholic Church councils (1545–1563) convened to respond to the Protestant Reformation — confirming Catholic doctrine, eliminating corruption, and launching the Counter-Reformation. It reaffirmed the seven sacraments, the authority of the Pope, and the Latin Vulgate Bible against Protestant challenges. The Jesuit order, founded in 1540, became the shock troops of this Catholic revival.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Council_of_Trent',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Council of Trent met from 1545 to ____ to reform the Catholic Church in response to Protestantism.', answer: '1563' },
+      { format: 'contrast', prompt: 'What did the Council of Trent reaffirm that Protestants rejected?', answer: 'The authority of the Pope and the seven sacraments', distractors: ['The primacy of the Bible over tradition', 'Salvation by faith alone', 'The invalidity of indulgences'] },
+    ],
+    edges: [
+      { to: 'protestant-reformation', relation: 'opposed' },
+      { to: 'jesuits', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'jesuits',
+    name: 'The Jesuits',
+    domain: 'religions',
+    approxYear: 1540,
+    eras: ['renaissance', 'enlightenment'],
+    summary:
+      'A Catholic religious order founded by Ignatius of Loyola in 1540, characterised by intellectual rigour, obedience to the Pope, and a mission to spread Catholicism worldwide. They established hundreds of schools and universities across Europe and led missions to Japan, China, India, and the Americas. Their global reach and political influence made them both the most powerful Catholic institution of the 16th–17th centuries and a target of suspicion — they were expelled from dozens of countries.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Society_of_Jesus',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Jesuits were founded by ____ of Loyola in 1540.', answer: 'Ignatius' },
+      { format: 'contrast', prompt: 'What distinguished the Jesuits from older Catholic orders?', answer: 'Their intellectual schools, global missions, and direct obedience to the Pope', distractors: ['They lived in monasteries and took strict vows of silence', 'They focused entirely on caring for the poor and sick', 'They were founded to combat Islam in the Crusades'] },
+    ],
+    edges: [{ to: 'council-of-trent', relation: 'part_of' }],
+  },
+  {
+    id: 'thirty-years-war',
+    name: 'The Thirty Years\' War',
+    domain: 'history',
+    approxYear: 1618,
+    eras: ['renaissance'],
+    lat: 51.0,
+    lng: 10.0,
+    summary:
+      'A catastrophic conflict fought mainly in the Holy Roman Empire (1618–1648) that began as a religious war between Protestant and Catholic states and evolved into a struggle for European dominance. It killed perhaps a third of the German population through battle, famine, and plague. The Peace of Westphalia (1648) that ended it established the modern principle of state sovereignty — each ruler decided their kingdom\'s religion.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Thirty_Years%27_War',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Thirty Years\' War (1618–1648) killed perhaps a ____ of the German population.', answer: 'third' },
+      { format: 'contrast', prompt: 'What modern principle did the Peace of Westphalia (1648) establish?', answer: 'State sovereignty — each ruler decided their state\'s religion', distractors: ['Freedom of religion for all individuals', 'The supremacy of international law over kings', 'The right of revolution against tyrannical rulers'] },
+    ],
+    edges: [
+      { to: 'peace-of-westphalia', relation: 'caused' },
+      { to: 'protestant-reformation', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'peace-of-westphalia',
+    name: 'Peace of Westphalia',
+    domain: 'politics',
+    approxYear: 1648,
+    eras: ['renaissance'],
+    lat: 51.96,
+    lng: 7.63,
+    summary:
+      'The pair of treaties signed in 1648 that ended the Thirty Years\' War and established the foundational principles of the modern international order. It recognised the sovereignty of states — their right to govern within their own borders without external interference — and ended the idea that the Pope or Emperor could legitimately override a nation\'s internal affairs. International relations scholars regard it as the birth certificate of the nation-state system.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Peace_of_Westphalia',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Peace of Westphalia (1648) established the principle of state ____, the cornerstone of the modern international order.', answer: 'sovereignty' },
+    ],
+    edges: [
+      { to: 'thirty-years-war', relation: 'successor_of' },
+      { to: 'enlightenment', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'spanish-inquisition',
+    name: 'The Spanish Inquisition',
+    domain: 'history',
+    approxYear: 1478,
+    eras: ['renaissance'],
+    lat: 40.4,
+    lng: -3.7,
+    summary:
+      'A tribunal established by Ferdinand and Isabella of Spain in 1478 to identify and punish heretics — particularly Jews and Muslims who had converted to Christianity but were suspected of secretly practising their old faiths. It operated for 356 years until its abolition in 1834, using torture to extract confessions and burning condemned heretics at public ceremonies called autos-da-fé. The image of sudden, ruthless interrogation made it a byword for arbitrary persecution.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Spanish_Inquisition',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Spanish Inquisition was established by Ferdinand and ____ in 1478.', answer: 'Isabella' },
+      { format: 'contrast', prompt: 'What were the primary targets of the Spanish Inquisition?', answer: 'Jewish and Muslim converts suspected of secretly practising their original religion', distractors: ['Protestant reformers from northern Europe', 'Atheists and scientists who challenged the Church', 'Political opponents of the Spanish crown'] },
+    ],
+    edges: [],
+  },
+  {
+    id: 'elizabeth-i',
+    name: 'Elizabeth I of England',
+    domain: 'history',
+    approxYear: 1588,
+    eras: ['renaissance'],
+    lat: 51.5,
+    lng: -0.12,
+    summary:
+      'Queen of England from 1558 to 1603, whose 45-year reign is called the Elizabethan Era — a golden age of English literature (Shakespeare, Marlowe), exploration (Drake, Raleigh), and Protestant consolidation. She never married, using her eligibility as a diplomatic tool, and was called the "Virgin Queen". Her defeat of the Spanish Armada in 1588 marked England\'s emergence as a major naval power.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Elizabeth_I',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Elizabeth I\'s defeat of the Spanish ____ in 1588 established England as a naval power.', answer: 'Armada' },
+      { format: 'contrast', prompt: 'Why did Elizabeth I never marry?', answer: 'She used her eligibility as a diplomatic tool and wanted to retain full power', distractors: ['She was betrothed to Philip II but he died before the wedding', 'Church law prevented an English queen from marrying a foreign prince', 'She secretly married a nobleman and kept it hidden'] },
+    ],
+    edges: [
+      { to: 'henry-viii', relation: 'successor_of' },
+      { to: 'spanish-inquisition', relation: 'opposed' },
+    ],
+  },
+  {
+    id: 'spanish-armada',
+    name: 'The Spanish Armada',
+    domain: 'history',
+    approxYear: 1588,
+    eras: ['renaissance'],
+    lat: 50.0,
+    lng: -5.0,
+    summary:
+      'A fleet of 130 Spanish warships sent by Philip II in 1588 to invade England, overthrow Elizabeth I, and restore Catholicism. The English fleet, combined with storms that wrecked much of the Armada on the Irish coast, defeated it decisively — only about half the ships returned to Spain. The defeat ended Spanish plans to dominate northern Europe and boosted England\'s confidence as a sea power.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Spanish_Armada',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Philip II sent 130 warships against England in 1588; only about ____ of them returned to Spain.', answer: 'half' },
+    ],
+    edges: [
+      { to: 'elizabeth-i', relation: 'opposed' },
+    ],
+  },
+  // ── Ottoman Empire ───────────────────────────────────────────────────────
+  {
+    id: 'ottoman-empire',
+    name: 'The Ottoman Empire',
+    domain: 'history',
+    approxYear: 1453,
+    eras: ['medieval', 'renaissance', 'enlightenment', 'revolution', 'long19c'],
+    lat: 41.0,
+    lng: 29.0,
+    summary:
+      'A Turkic empire founded around 1299 that at its peak (16th–17th centuries) controlled Anatolia, the Middle East, North Africa, and southeastern Europe as far as Hungary. Constantinople fell to Sultan Mehmed II in 1453, ending the Byzantine Empire and making the Ottomans the dominant power between Europe and Asia. The empire lasted over 600 years, finally dissolving in 1922 after World War I.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Ottoman_Empire',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Ottoman Empire captured Constantinople in ____, ending the Byzantine Empire.', answer: '1453' },
+      { format: 'contrast', prompt: 'Which Sultan conquered Constantinople in 1453?', answer: 'Mehmed II', distractors: ['Suleiman the Magnificent', 'Selim I', 'Bayezid I'] },
+    ],
+    edges: [
+      { to: 'byzantine-empire', relation: 'successor_of' },
+      { to: 'islam-core', relation: 'belief_in' },
+      { to: 'suleiman-magnificent', relation: 'caused' },
+    ],
+  },
+  {
+    id: 'suleiman-magnificent',
+    name: 'Suleiman the Magnificent',
+    domain: 'history',
+    approxYear: 1520,
+    eras: ['renaissance'],
+    lat: 41.0,
+    lng: 29.0,
+    summary:
+      'The longest-reigning Ottoman sultan (1520–1566), under whom the empire reached its greatest extent — stretching from Algeria to Iraq, and besieging Vienna in 1529. He was called "the Lawgiver" in the Islamic world for codifying Ottoman law, and "the Magnificent" in Europe for his wealth and court. His navy dominated the Mediterranean, and his reign is considered the Ottoman golden age.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Suleiman_the_Magnificent',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Suleiman the Magnificent besieged Vienna in ____, reaching the empire\'s greatest territorial extent.', answer: '1529' },
+      { format: 'contrast', prompt: 'What nickname did the Ottoman world give Suleiman, contrasting with his European title "the Magnificent"?', answer: 'The Lawgiver — for his codification of Ottoman law', distractors: ['The Conqueror — for taking Constantinople', 'The Devout — for his religious reform', 'The Builder — for the mosques he constructed'] },
+    ],
+    edges: [{ to: 'ottoman-empire', relation: 'part_of' }],
+  },
+  // ── Early Scientific Revolution ──────────────────────────────────────────
+  {
+    id: 'galileo',
+    name: 'Galileo Galilei',
+    domain: 'science',
+    approxYear: 1610,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'An Italian astronomer and physicist who pointed a telescope at the sky in 1609 and discovered that Jupiter had moons, Venus had phases, and the Moon had mountains — evidence that Copernicus was right and the Earth was not the centre of the universe. The Inquisition forced him to recant under threat of torture in 1633 and placed him under house arrest for the rest of his life. He is often called the "father of observational astronomy".',
+    wikipedia: 'https://en.wikipedia.org/wiki/Galileo_Galilei',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Galileo discovered that ____ had moons, supporting the view that the Earth was not the centre of the universe.', answer: 'Jupiter' },
+      { format: 'contrast', prompt: 'Why did the Inquisition put Galileo under house arrest in 1633?', answer: 'He confirmed Copernicus\' heliocentric model with observations', distractors: ['He denied the existence of God in his writings', 'He said the Pope had no authority over science', 'He published maps revealing Ottoman military positions'] },
+    ],
+    edges: [
+      { to: 'copernicus', relation: 'influenced_by' },
+      { to: 'scientific-revolution', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'francis-bacon',
+    name: 'Francis Bacon',
+    domain: 'science',
+    approxYear: 1620,
+    eras: ['renaissance'],
+    lat: 51.5,
+    lng: -0.12,
+    summary:
+      'An English philosopher who argued in Novum Organum (1620) that knowledge should be built from observation and experiment — not inherited from ancient authorities like Aristotle. His systematic approach to gathering evidence is considered the foundation of the scientific method. He coined the phrase "knowledge is power" and imagined a state-funded research institute centuries before any existed.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Francis_Bacon',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Francis Bacon argued in Novum Organum that knowledge must be built from ____ and experiment, not ancient authorities.', answer: 'observation' },
+    ],
+    edges: [{ to: 'scientific-revolution', relation: 'caused' }],
+  },
+  {
+    id: 'rene-descartes',
+    name: 'René Descartes',
+    domain: 'science',
+    approxYear: 1637,
+    eras: ['renaissance'],
+    lat: 48.85,
+    lng: 2.35,
+    summary:
+      'A French mathematician and philosopher who founded analytic geometry and wrote the line "I think, therefore I am" (cogito ergo sum) — his starting point for rebuilding all human knowledge from scratch through reason alone. His method of radical doubt — questioning everything that could possibly be false — defined the rationalist tradition in philosophy. He also described the universe as a giant machine operating according to mathematical laws.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Ren%C3%A9_Descartes',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Descartes\' famous phrase "I think, therefore I ____" was his starting point for rebuilding all knowledge through reason.', answer: 'am' },
+      { format: 'contrast', prompt: 'What mathematical field did Descartes invent, connecting algebra and geometry?', answer: 'Analytic geometry', distractors: ['Calculus', 'Set theory', 'Probability theory'] },
+    ],
+    edges: [{ to: 'scientific-revolution', relation: 'part_of' }],
+  },
+  {
+    id: 'dutch-golden-age',
+    name: 'The Dutch Golden Age',
+    domain: 'history',
+    approxYear: 1650,
+    eras: ['renaissance'],
+    lat: 52.37,
+    lng: 4.89,
+    summary:
+      'A period in the 17th century when the Dutch Republic became the world\'s dominant trading power, controlling the spice trade through the Dutch East India Company (VOC) — the first multinational corporation and the first company to issue shares. Dutch painters including Rembrandt and Vermeer produced masterworks, and Amsterdam\'s canal-ring became the wealthiest city in Europe. The Republic\'s religious tolerance attracted persecuted thinkers from across Europe.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Dutch_Golden_Age',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'The Dutch East India Company (____) was the world\'s first company to issue shares to the public.', answer: 'VOC' },
+      { format: 'contrast', prompt: 'Why did persecuted thinkers from across Europe flock to the Dutch Republic in the 17th century?', answer: 'Its religious tolerance was exceptional for the era', distractors: ['It had the most powerful army in Europe', 'It offered free university education to scholars', 'Its universities paid higher salaries than anywhere else'] },
+    ],
+    edges: [
+      { to: 'age-of-exploration', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'thomas-more',
+    name: 'Thomas More and Utopia',
+    domain: 'culture',
+    approxYear: 1516,
+    eras: ['renaissance'],
+    lat: 51.5,
+    lng: -0.12,
+    summary:
+      'An English lawyer and humanist scholar who wrote Utopia (1516), imagining a perfect island society with no private property, religious tolerance, and elected leaders — coining the word "utopia" (meaning "no place"). As Lord Chancellor under Henry VIII he refused to accept Henry\'s supremacy over the Church of England and was beheaded in 1535. He was declared a saint by the Catholic Church in 1935.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Thomas_More',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Thomas More coined the word "____" in his 1516 book describing an ideal imaginary society.', answer: 'utopia' },
+      { format: 'contrast', prompt: 'Why was Thomas More executed by Henry VIII in 1535?', answer: 'He refused to accept Henry\'s supremacy over the Church', distractors: ['He conspired with the Spanish Armada', 'He refused to hand over Church funds to the crown', 'He published writings criticising Henry\'s divorce'] },
+    ],
+    edges: [
+      { to: 'henry-viii', relation: 'influenced_by' },
+      { to: 'humanism', relation: 'part_of' },
+    ],
+  },
+  {
+    id: 'perspective-in-art',
+    name: 'Linear Perspective',
+    domain: 'culture',
+    approxYear: 1420,
+    eras: ['renaissance'],
+    lat: 43.77,
+    lng: 11.26,
+    summary:
+      'A mathematical technique for depicting three-dimensional space on a flat surface, rediscovered and formalised by Filippo Brunelleschi and Leon Battista Alberti in 15th-century Florence. It works by making parallel lines converge toward a vanishing point on the horizon, creating the illusion of depth. Its adoption transformed painting from medieval flat symbolism to realistic representation — one of the defining achievements of the Renaissance.',
+    wikipedia: 'https://en.wikipedia.org/wiki/Perspective_(graphical)',
+    imageUrl: null,
+    questions: [
+      { format: 'cloze', prompt: 'Linear perspective creates depth by making parallel lines converge toward a ____ point on the horizon.', answer: 'vanishing' },
+      { format: 'contrast', prompt: 'Who is credited with formalising linear perspective in 15th-century Florence?', answer: 'Brunelleschi and Alberti', distractors: ['Leonardo da Vinci and Raphael', 'Michelangelo and Botticelli', 'Giotto and Dante'] },
+    ],
+    edges: [{ to: 'the-renaissance', relation: 'part_of' }],
+  },
+]

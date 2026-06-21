@@ -131,6 +131,7 @@ export function HomeView({
                   <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-softer">
                     <Pill label="due" value={t.due} accent={t.due > 0} />
                     <Pill label="new" value={t.newAvailable} accent={t.newAvailable > 0} />
+                    {t.lockedNew > 0 && <Pill label="locked" value={t.lockedNew} />}
                     <Pill label="met" value={t.met} />
                     <Pill label="in story" value={t.total} />
                   </div>

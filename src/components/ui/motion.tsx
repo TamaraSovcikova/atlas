@@ -19,8 +19,28 @@ export function MotionProvider({ children }: { children: ReactNode }) {
 export const spring = { type: 'spring' as const, stiffness: 380, damping: 30 }
 export const ease = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }
 
+export type SwipeDir = 'left' | 'right' | null
+
 export const cardVariants = {
-  enter: { opacity: 0, y: 14, scale: 0.99 },
-  center: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: -10, scale: 0.99 },
+  enter: (dir: SwipeDir) => ({
+    opacity: 0,
+    x: dir === 'right' ? -56 : dir === 'left' ? 56 : 0,
+    y: dir ? 4 : 14,
+    scale: 0.97,
+  }),
+  center: { opacity: 1, x: 0, y: 0, scale: 1 },
+  exit: (dir: SwipeDir) => ({
+    opacity: 0,
+    x: dir === 'left' ? -160 : dir === 'right' ? 160 : 0,
+    y: dir ? 0 : -10,
+    scale: dir ? 0.92 : 0.99,
+    rotate: dir === 'left' ? -5 : dir === 'right' ? 5 : 0,
+  }),
+}
+
+export const cardTransition = {
+  type: 'spring' as const,
+  stiffness: 360,
+  damping: 30,
+  mass: 0.85,
 }

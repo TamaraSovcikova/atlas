@@ -538,10 +538,16 @@ export async function buildThreadSession(
   )
   const byId = new Map(concepts.map((c) => [c.id, c]))
 
+  // Preload all reviews for thread members so we can gate tier unlocks without
+  // extra round-trips. This includes non-due reviews (stability check).
+  const allMemberReviews = await db.reviews.where('conceptId').anyOf(memberIds).toArray()
+  const allReviewByConcept = new Map(allMemberReviews.map((r) => [r.conceptId, r]))
+  const unlockedTiers = computeUnlockedTiers(thread.members, byId, allReviewByConcept)
+
   const recall: RecallItem[] = []
   let rot = 0
 
-  // Due reviews already met in this thread.
+  // Due reviews: no tier gate — keep reviewing concepts already introduced.
   const dueReviews = await db.reviews.where('dueAt').belowOrEqual(now).toArray()
   for (const review of dueReviews) {
     const concept = byId.get(review.conceptId)
@@ -550,9 +556,13 @@ export async function buildThreadSession(
     if (item) recall.push(item)
   }
 
-  // Introduce new concepts: tier ascending, then chronological. Skeleton first.
+  // Introduce new concepts: unlocked tiers only, then tier ascending, then chronological.
   const fresh = concepts
-    .filter((c) => c.firstSeenAt === null && !recall.some((r) => r.concept.id === c.id))
+    .filter((c) => {
+      if (c.firstSeenAt !== null) return false
+      if (recall.some((r) => r.concept.id === c.id)) return false
+      return unlockedTiers.has(tierByConcept.get(c.id) ?? 1)
+    })
     .sort((a, b) => {
       const ta = tierByConcept.get(a.id) ?? 1
       const tb = tierByConcept.get(b.id) ?? 1
@@ -578,12 +588,54 @@ export async function buildThreadSession(
   return countPlan(items, 'thread', null, null, threadId)
 }
 
+/** Minimum FSRS stability (days) a tier must reach before the next tier unlocks. */
+export const TIER_STABILITY_GATE = 7.0
+
+/**
+ * Compute which tiers are unlocked for a thread given the current concept and
+ * review state. Tier 1 is always unlocked; tier N+1 unlocks once all tier-N
+ * concepts have been seen AND each has stability >= TIER_STABILITY_GATE.
+ * Uses preloaded maps to avoid extra DB round-trips.
+ */
+function computeUnlockedTiers(
+  members: { conceptId: string; tier: number }[],
+  conceptById: Map<string, Concept>,
+  reviewByConcept: Map<string, Review>,
+): Set<number> {
+  const maxTier = members.reduce((m, x) => Math.max(m, x.tier), 1)
+  const unlocked = new Set<number>([1])
+
+  for (let t = 1; t < maxTier; t++) {
+    const tierMembers = members.filter((m) => m.tier === t)
+    const allSeen = tierMembers.every((m) => {
+      const c = conceptById.get(m.conceptId)
+      return c?.firstSeenAt != null
+    })
+    if (!allSeen) break
+
+    const stabilities = tierMembers.flatMap((m) => {
+      const r = reviewByConcept.get(m.conceptId)
+      return r ? [r.stability] : []
+    })
+    if (stabilities.length < tierMembers.length) break
+
+    if (Math.min(...stabilities) >= TIER_STABILITY_GATE) {
+      unlocked.add(t + 1)
+    } else {
+      break
+    }
+  }
+
+  return unlocked
+}
+
 export interface ThreadSummary {
   threadId: string
   name: string
   description: string
   due: number
   newAvailable: number
+  lockedNew: number
   met: number
   total: number
 }
@@ -596,12 +648,14 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
   for (const c of await db.concepts.toArray()) conceptById.set(c.id, c)
 
   return threads.map((t) => {
+    const unlockedTiers = computeUnlockedTiers(t.members, conceptById, reviewByConcept)
     const summary: ThreadSummary = {
       threadId: t.id,
       name: t.name,
       description: t.description,
       due: 0,
       newAvailable: 0,
+      lockedNew: 0,
       met: 0,
       total: 0,
     }
@@ -609,8 +663,12 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
       const concept = conceptById.get(m.conceptId)
       if (!concept) continue
       summary.total++
-      if (concept.firstSeenAt === null) summary.newAvailable++
-      else summary.met++
+      if (concept.firstSeenAt === null) {
+        if (unlockedTiers.has(m.tier)) summary.newAvailable++
+        else summary.lockedNew++
+      } else {
+        summary.met++
+      }
       const review = reviewByConcept.get(m.conceptId)
       if (review && review.dueAt <= now && concept.firstSeenAt !== null) summary.due++
     }

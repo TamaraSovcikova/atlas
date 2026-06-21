@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildDomainSession,
   buildEraSession,
@@ -17,7 +17,7 @@ import { SwipeRatingZone } from './SwipeRatingZone'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
-import { M, AnimatePresence, cardVariants, ease } from './ui/motion'
+import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
 
 interface Props {
   shape: 'era' | 'domain' | 'spaced' | 'thread'
@@ -66,11 +66,13 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const [index, setIndex] = useState(0)
   const [startedAt] = useState(() => Date.now())
   const [ratings, setRatings] = useState<RecallRating[]>([])
+  const ratingsRef = useRef<RecallRating[]>([])
   const [done, setDone] = useState(false)
   const [activeConcept, setActiveConcept] = useState<string | null>(null)
   const [pulseKey, setPulseKey] = useState(0)
   const [revealedRating, setRevealedRating] = useState<RecallRating | null | undefined>(undefined)
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
+  const [swipeDir, setSwipeDir] = useState<SwipeDir>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -125,15 +127,22 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
       for (const r of results) {
         await recordRating(r.conceptId, r.rating, now)
       }
-      setRatings((prev) => [...prev, ...results.map((r) => r.rating)])
+      const newRatings = results.map((r) => r.rating)
+      ratingsRef.current = [...ratingsRef.current, ...newRatings]
+      setRatings(ratingsRef.current)
       const nextIndex = index + 1
       if (nextIndex >= plan.items.length) {
+        // True first-try retention: share of answers that were not 'again'.
+        const all = ratingsRef.current
+        const accuracy = all.length
+          ? all.filter((r) => r !== 'again').length / all.length
+          : null
         await db.sessions.add({
           startedAt,
           durationMs: now - startedAt,
           newCount: plan.newCount,
           reviewCount: plan.reviewCount,
-          accuracy: null,
+          accuracy,
           shape: plan.shape,
           eraId: plan.eraId,
           domain: plan.domain,
@@ -156,6 +165,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const handleRate = useCallback(
     async (rating: RecallRating) => {
       if (!current || current.kind !== 'recall') return
+      setSwipeDir(rating === 'again' ? 'left' : 'right')
       await handleDone([{ conceptId: current.concept.id, rating }])
     },
     [current, handleDone],
@@ -170,32 +180,74 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
       ratings.length === 0
         ? null
         : ratings.filter((r) => r !== 'again').length / ratings.length
+    const great = accuracy !== null && accuracy >= 0.8
+    const pct = accuracy !== null ? Math.round(accuracy * 100) : null
     return (
       <M.section
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={ease}
         className="surface p-8"
       >
-        <div className="text-3xl">{accuracy !== null && accuracy >= 0.8 ? '🌟' : '✨'}</div>
-        <h2 className="mt-2 font-serif text-2xl">Session complete</h2>
-        <p className="mt-3 text-ink-soft">
-          {plan.items.length === 0
-            ? 'Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.'
-            : `${ratings.length} answer${ratings.length === 1 ? '' : 's'}. ${
-                accuracy !== null ? `${Math.round(accuracy * 100)}% recalled.` : ''
-              } The ones you missed will come back sooner.`}
-        </p>
-        <Button onClick={onFinished} className="mt-6">
-          Back to home
-        </Button>
+        <M.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 22, delay: 0.05 }}
+          className="text-4xl"
+        >
+          {plan.items.length === 0 ? '☁️' : great ? '🌟' : '✨'}
+        </M.div>
+        <M.h2
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...ease, delay: 0.12 }}
+          className="mt-3 font-serif text-2xl"
+        >
+          {plan.items.length === 0 ? 'Nothing due' : 'Session complete'}
+        </M.h2>
+        {plan.items.length === 0 ? (
+          <M.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ ...ease, delay: 0.18 }}
+            className="mt-3 text-ink-soft"
+          >
+            Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.
+          </M.p>
+        ) : (
+          <M.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...ease, delay: 0.18 }}
+            className="mt-4 flex gap-6"
+          >
+            <div>
+              <p className="text-3xl font-serif font-semibold text-ink">{ratings.length}</p>
+              <p className="mt-0.5 text-[11px] uppercase tracking-wider text-ink-softer">cards</p>
+            </div>
+            {pct !== null && (
+              <div>
+                <p className={`text-3xl font-serif font-semibold ${great ? 'text-good' : 'text-ink'}`}>{pct}%</p>
+                <p className="mt-0.5 text-[11px] uppercase tracking-wider text-ink-softer">recalled</p>
+              </div>
+            )}
+          </M.div>
+        )}
+        <M.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ ...ease, delay: 0.28 }}
+        >
+          <Button onClick={onFinished} className="mt-8">
+            Back to home
+          </Button>
+        </M.div>
       </M.section>
     )
   }
 
   if (!current) return <p className="text-ink-softer">Session ended.</p>
 
-  const progress = (index + (pulseKey > 0 ? 1 : 0)) / plan.items.length
   const isRecallCard = current.kind === 'recall'
   const swipeVisible = isRecallCard && revealedRating !== undefined
 
@@ -226,23 +278,40 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
           </button>
         </div>
 
-        <div className="h-1 overflow-hidden rounded-full bg-bg-softer">
-          <M.div
-            className="h-full rounded-full bg-accent-grad"
-            animate={{ width: `${Math.round(progress * 100)}%` }}
-            transition={ease}
-          />
+        {/* Segmented progress dots */}
+        <div className="flex gap-1">
+          {plan.items.map((_, i) => (
+            <M.div
+              key={i}
+              className="h-1.5 flex-1 rounded-full"
+              animate={{
+                backgroundColor:
+                  i < index
+                    ? '#fbbf24'
+                    : i === index
+                      ? 'rgba(251,191,36,0.45)'
+                      : 'rgba(44,37,27,1)',
+              }}
+              transition={{ duration: 0.3 }}
+            />
+          ))}
         </div>
 
-        <AnimatePresence mode="wait">
+        {/* Ghost card stack for depth */}
+        <div className="relative">
+          <div className="absolute inset-x-4 -top-2.5 bottom-0 rounded-2xl border border-white/[0.03] bg-bg-softer/40" />
+          <div className="absolute inset-x-2 -top-1.5 bottom-0 rounded-2xl border border-white/[0.05] bg-bg-softer/60" />
+
+        <AnimatePresence mode="wait" custom={swipeDir}>
           <M.div
             key={current.cardKey}
+            custom={swipeDir}
             variants={cardVariants}
             initial="enter"
             animate="center"
             exit="exit"
-            transition={ease}
-            className="surface overflow-hidden"
+            transition={cardTransition}
+            className="relative surface overflow-hidden"
           >
             {/* Scrollable card content */}
             <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(55svh)' }}>
@@ -270,6 +339,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
             )}
           </M.div>
         </AnimatePresence>
+        </div>{/* end ghost stack wrapper */}
       </div>
 
       <ConceptRabbitHole rootConceptId={rabbitHoleId} onClose={() => setRabbitHoleId(null)} />

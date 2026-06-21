@@ -14,13 +14,12 @@ export function SwipeRatingZone({ onRate, suggestedRating }: Props) {
   const x = useMotionValue(0)
   const dragDist = useRef(0)
 
-  const againOpacity = useTransform(x, [-THRESHOLD, 0], [1, suggestedRating === 'again' ? 0.65 : 0.3])
-  const goodOpacity = useTransform(x, [0, THRESHOLD], [suggestedRating === 'good' ? 0.65 : 0.3, 1])
-  const bgColor = useTransform(
-    x,
-    [-THRESHOLD, 0, THRESHOLD],
-    ['rgba(239,68,68,0.12)', 'rgba(0,0,0,0)', 'rgba(212,175,112,0.12)'],
-  )
+  const leftFill = useTransform(x, [-THRESHOLD, -12, 0], [1, 0.35, 0])
+  const rightFill = useTransform(x, [0, 12, THRESHOLD], [0, 0.35, 1])
+  const againScale = useTransform(x, [-THRESHOLD, 0], [1.3, suggestedRating === 'again' ? 0.9 : 0.72])
+  const goodScale = useTransform(x, [0, THRESHOLD], [suggestedRating === 'good' ? 0.9 : 0.72, 1.3])
+  const hintOpacity = useTransform(x, [-THRESHOLD / 2, 0, THRESHOLD / 2], [0, 1, 0])
+  const rotate = useTransform(x, [-THRESHOLD, THRESHOLD], [-2, 2])
 
   function handleDragEnd(_: unknown, info: { offset: { x: number } }) {
     if (info.offset.x <= -THRESHOLD) onRate('again')
@@ -45,33 +44,45 @@ export function SwipeRatingZone({ onRate, suggestedRating }: Props) {
 
   return (
     <M.div
-      style={{ x, backgroundColor: bgColor }}
+      style={{ x, rotate }}
       drag="x"
       dragConstraints={{ left: -300, right: 300 }}
-      dragElastic={0.08}
-      onDragStart={() => {
-        dragDist.current = 0
-      }}
+      dragElastic={0.06}
+      onDragStart={() => { dragDist.current = 0 }}
       onDrag={(_: unknown, info: { offset: { x: number } }) => {
         dragDist.current = Math.abs(info.offset.x)
       }}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
-      className="flex cursor-grab select-none items-center justify-between rounded-2xl border border-white/[0.08] px-5 py-4 active:cursor-grabbing"
+      className="relative overflow-hidden rounded-2xl border border-white/[0.08] cursor-grab select-none active:cursor-grabbing"
     >
-      <M.div style={{ opacity: againOpacity }} className="flex items-center gap-2 text-red-400">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-        <span className="text-sm font-medium">See again</span>
-      </M.div>
-      <span className="text-[11px] uppercase tracking-wider text-ink-softer">{hint}</span>
-      <M.div style={{ opacity: goodOpacity }} className="flex items-center gap-2 text-accent">
-        <span className="text-sm font-medium">Got it</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="m9 18 6-6-6-6" />
-        </svg>
-      </M.div>
+      {/* colored fills */}
+      <M.div style={{ opacity: leftFill }} className="pointer-events-none absolute inset-0 bg-red-500/22" />
+      <M.div style={{ opacity: rightFill }} className="pointer-events-none absolute inset-0 bg-accent/18" />
+
+      <div className="relative flex items-center justify-between px-5 py-4">
+        <M.div style={{ scale: againScale }} className="flex items-center gap-2.5 text-red-400">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-red-400/35 bg-red-500/12">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </div>
+          <span className="text-sm font-medium">See again</span>
+        </M.div>
+
+        <M.span style={{ opacity: hintOpacity }} className="text-[10px] uppercase tracking-wider text-ink-softer">
+          {hint}
+        </M.span>
+
+        <M.div style={{ scale: goodScale }} className="flex items-center gap-2.5 text-amber-400">
+          <span className="text-sm font-medium">Got it</span>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/12">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </div>
+        </M.div>
+      </div>
     </M.div>
   )
 }
