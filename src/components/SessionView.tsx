@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { progressSnapshot } from '../lib/progress'
 import {
-  buildDailySession,
   buildDomainSession,
   buildEraSession,
   buildSpacedSession,
@@ -10,6 +9,7 @@ import {
   type SessionItem,
   type SessionPlan,
 } from '../lib/session'
+import { resumeOrBuildDaily, saveDailyProgress, completeDaily } from '../lib/dailyPlan'
 import { applyRating, type RecallRating } from '../lib/fsrs'
 import { db, type Domain, type Era } from '../db/schema'
 import { useSettings } from '../store/useSettings'
@@ -67,7 +67,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const [era, setEra] = useState<Era | null>(null)
   const [threadName, setThreadName] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
-  const [startedAt] = useState(() => Date.now())
+  const [startedAt, setStartedAt] = useState(() => Date.now())
   const [ratings, setRatings] = useState<RecallRating[]>([])
   const ratingsRef = useRef<RecallRating[]>([])
   const [done, setDone] = useState(false)
@@ -83,7 +83,18 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     async function load() {
       let p: SessionPlan
       if (shape === 'daily') {
-        p = await buildDailySession(prefs)
+        // Resume today's persisted plan if one is in progress, else build + store.
+        const state = await resumeOrBuildDaily(prefs)
+        if (cancelled) return
+        p = state.plan
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       } else if (shape === 'era' && eraId) {
         p = await buildEraSession(eraId, prefs)
         const e = await db.eras.get(eraId)
@@ -154,14 +165,16 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
           domain: plan.domain,
           threadId: plan.threadId,
         })
+        if (shape === 'daily') await completeDaily()
         setDone(true)
       } else {
+        if (shape === 'daily') await saveDailyProgress(nextIndex, ratingsRef.current)
         setIndex(nextIndex)
         setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
         setPulseKey(0)
       }
     },
-    [plan, index, startedAt],
+    [plan, index, startedAt, shape],
   )
 
   const handleRevealed = useCallback((rating: RecallRating | null) => {

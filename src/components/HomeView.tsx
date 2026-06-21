@@ -11,6 +11,7 @@ import {
 } from '../lib/session'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { progressSnapshot } from '../lib/progress'
+import { getDailyResume, type DailyResume } from '../lib/dailyPlan'
 import { useSettings } from '../store/useSettings'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
@@ -96,11 +97,13 @@ export function HomeView({
   const [eraSummaries, setEraSummaries] = useState<Map<string, EraSummary>>(new Map())
   const [domainSummaries, setDomainSummaries] = useState<Map<Domain, DomainSummary>>(new Map())
   const [threadSummaries, setThreadSummaries] = useState<ThreadSummary[]>([])
+  const [dailyResume, setDailyResume] = useState<DailyResume | null>(null)
 
   useEffect(() => {
     summariseEras().then(setEraSummaries)
     summariseDomains().then(setDomainSummaries)
     summariseThreads().then(setThreadSummaries)
+    getDailyResume().then(setDailyResume)
   }, [conceptCount, learnedCount, dueNow])
 
   const masteredCount = spread.counts.mastered + spread.counts.known
@@ -159,11 +162,12 @@ export function HomeView({
           </span>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          A composed mix: everything the scheduler says is due, then a few new concepts from your
-          pathway. One pass, then you're done for the day.
+          {dailyResume
+            ? `You're partway through — ${dailyResume.done} of ${dailyResume.total} done. Pick up where you left off.`
+            : "A composed mix: everything the scheduler says is due, then a few new concepts from your pathway. One pass, then you're done for the day."}
         </p>
         <Button onClick={onStartDaily} className="mt-5 w-full">
-          {snapshot.todayCards > 0 ? 'Continue today' : 'Begin today'}
+          {dailyResume ? `Continue today — ${dailyResume.remaining} left` : 'Begin today'}
         </Button>
       </div>
 
