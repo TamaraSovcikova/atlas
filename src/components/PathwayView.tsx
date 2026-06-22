@@ -3,7 +3,6 @@ import { summariseThreads, type ThreadSummary } from '../lib/session'
 import { M } from './ui/motion'
 
 interface Props {
-  onClose: () => void
   onStartThread: (threadId: string) => void
 }
 
@@ -16,7 +15,7 @@ function stateOf(t: ThreadSummary, isCurrent: boolean): NodeState {
   return 'available'
 }
 
-export function PathwayView({ onClose, onStartThread }: Props) {
+export function PathwayView({ onStartThread }: Props) {
   const [threads, setThreads] = useState<ThreadSummary[]>([])
 
   useEffect(() => {
@@ -28,17 +27,12 @@ export function PathwayView({ onClose, onStartThread }: Props) {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="font-serif text-2xl text-ink">Your pathway</h2>
-          <p className="mt-1 text-sm text-ink-softer">
-            A guided climb through the stories. Finish one, the next opens up.
-          </p>
-        </div>
-        <button type="button" onClick={onClose} className="text-sm text-ink-softer hover:text-ink">
-          Done
-        </button>
-      </header>
+      <div>
+        <h2 className="font-serif text-2xl text-ink">Your pathway</h2>
+        <p className="mt-1 text-sm text-ink-softer">
+          A guided climb through the stories. Finish one, the next opens up.
+        </p>
+      </div>
 
       <ol className="relative space-y-3">
         {threads.map((t, i) => {

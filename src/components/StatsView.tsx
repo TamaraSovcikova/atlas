@@ -5,13 +5,9 @@ import { dayStats, dayIndex, metDays, progressSnapshot } from '../lib/progress'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { useSettings } from '../store/useSettings'
 
-interface Props {
-  onClose: () => void
-}
-
 const WEEKS = 14
 
-export function StatsView({ onClose }: Props) {
+export function StatsView() {
   const prefs = useSettings((s) => s.prefs)
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
   const concepts = useLiveQuery(() => db.concepts.toArray(), [], [])
@@ -60,12 +56,9 @@ export function StatsView({ onClose }: Props) {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between">
+      <div>
         <h2 className="font-serif text-2xl text-ink">Your progress</h2>
-        <button type="button" onClick={onClose} className="text-sm text-ink-softer hover:text-ink">
-          Done
-        </button>
-      </header>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <BigStat glyph="🔥" value={snapshot.streak} label="day streak" />

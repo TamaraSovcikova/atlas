@@ -12,13 +12,9 @@ import {
   pullFromCloud,
 } from '../lib/sync'
 
-interface Props {
-  onClose: () => void
-}
-
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 
-export function SettingsView({ onClose }: Props) {
+export function SettingsView() {
   const prefs = useSettings((s) => s.prefs)
   const update = useSettings((s) => s.update)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -85,11 +81,8 @@ export function SettingsView({ onClose }: Props) {
 
   return (
     <section className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div>
         <h2 className="font-serif text-2xl">Settings</h2>
-        <button type="button" onClick={onClose} className="text-sm text-ink-softer hover:text-ink">
-          Done
-        </button>
       </div>
 
       <div className="space-y-3">
