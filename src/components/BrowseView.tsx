@@ -9,6 +9,7 @@ import {
   type EraSummary,
   type ThreadSummary,
 } from '../lib/session'
+import { getSessionResume, type DailyResume } from '../lib/dailyPlan'
 import { useSettings } from '../store/useSettings'
 import { Button } from './ui/Button'
 
@@ -48,11 +49,22 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
   const [eraSummaries, setEraSummaries] = useState<Map<string, EraSummary>>(new Map())
   const [domainSummaries, setDomainSummaries] = useState<Map<Domain, DomainSummary>>(new Map())
   const [threadSummaries, setThreadSummaries] = useState<ThreadSummary[]>([])
+  const [threadResume, setThreadResume] = useState<Map<string, DailyResume>>(new Map())
 
   useEffect(() => {
     summariseEras().then(setEraSummaries)
     summariseDomains().then(setDomainSummaries)
-    summariseThreads().then(setThreadSummaries)
+    summariseThreads().then(async (threads) => {
+      setThreadSummaries(threads)
+      const resumeMap = new Map<string, DailyResume>()
+      await Promise.all(
+        threads.map(async (t) => {
+          const r = await getSessionResume('thread', t.threadId)
+          if (r) resumeMap.set(t.threadId, r)
+        }),
+      )
+      setThreadResume(resumeMap)
+    })
   }, [conceptCount, learnedCount, dueNow, prefs])
 
   const q = query.trim().toLowerCase()
@@ -123,6 +135,7 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
           )}
           {filteredThreads.map((t) => {
             const empty = t.total === 0
+            const resume = threadResume.get(t.threadId)
             return (
               <li key={t.threadId}>
                 <button
@@ -131,7 +144,14 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
                   onClick={() => onStartThread(t.threadId)}
                   className="surface group w-full p-5 text-left transition-all hover:border-accent/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <h3 className="font-serif text-lg text-ink">{t.name}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-serif text-lg text-ink">{t.name}</h3>
+                    {resume && (
+                      <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                        {resume.remaining} left
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-sm text-ink-soft">{t.description}</p>
                   <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-softer">
                     <Pill label="due" value={t.due} accent={t.due > 0} />

@@ -1,13 +1,20 @@
-import { db, type RecallQuestion } from '../db/schema'
+import { db, type Domain, type RecallQuestion, type SessionShape } from '../db/schema'
 import type { RecallRating } from './fsrs'
 import { dayIndex } from './progress'
 import {
   buildDailySession,
+  buildEraSession,
+  buildDomainSession,
+  buildThreadSession,
+  buildSpacedSession,
   type SessionItem,
   type SessionPlan,
   type SortBucket,
 } from './session'
 import type { Prefs } from './settings'
+
+/** Non-daily sessions expire after 8 hours of inactivity. */
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000
 
 /**
  * The daily session, persisted. Previously "today" was rebuilt on every entry
@@ -202,6 +209,137 @@ export interface DailyResume {
 export async function getDailyResume(now = Date.now()): Promise<DailyResume | null> {
   const stored = await readStored()
   if (!stored || stored.day !== dayIndex(now) || stored.completed) return null
+  const total = stored.items.length
+  const done = Math.min(stored.cursor, total)
+  if (done <= 0 || done >= total) return null
+  return { remaining: total - done, total, done }
+}
+
+// ── Generic non-daily session persistence ─────────────────────────────────
+
+/**
+ * Derive a stable settings key for any non-daily session shape so each
+ * (shape, id) combination lives in its own slot independent of the daily plan.
+ */
+function sessionKey(shape: SessionShape, id: string | null): string {
+  return `session:${shape}:${id ?? ''}`
+}
+
+async function readSession(key: string): Promise<StoredPlan | null> {
+  const row = await db.settings.get(key)
+  return (row?.value as StoredPlan | undefined) ?? null
+}
+
+async function writeSession(key: string, plan: StoredPlan): Promise<void> {
+  await db.settings.put({ key, value: plan })
+}
+
+function toAnySessionPlan(
+  items: SessionItem[],
+  newCount: number,
+  reviewCount: number,
+  shape: SessionShape,
+  eraId: string | null,
+  domain: Domain | null,
+  threadId: string | null,
+): SessionPlan {
+  return { items, newCount, reviewCount, shape, eraId, domain, threadId }
+}
+
+export interface SessionState extends DailyPlanState {
+  /** True when the session was rehydrated from a previous run. */
+  restored: boolean
+}
+
+/**
+ * Resume an in-progress session for the given shape/id, or build and persist
+ * a new one. Non-daily sessions expire after SESSION_TTL_MS of inactivity.
+ */
+export async function resumeOrBuildSession(
+  shape: Exclude<SessionShape, 'daily'>,
+  id: string | null,
+  prefs: Prefs,
+  now = Date.now(),
+): Promise<DailyPlanState> {
+  const key = sessionKey(shape, id)
+  const stored = await readSession(key)
+  const notExpired = stored && now - stored.updatedAt < SESSION_TTL_MS
+
+  if (stored && notExpired && !stored.completed) {
+    const items = await rehydrateItems(stored.items)
+    if (items.length > 0 && stored.cursor < items.length) {
+      const plan = toAnySessionPlan(
+        items, stored.newCount, stored.reviewCount,
+        shape,
+        shape === 'era' ? id : null,
+        shape === 'domain' ? (id as Domain) : null,
+        shape === 'thread' ? id : null,
+      )
+      return { plan, cursor: stored.cursor, ratings: stored.ratings, startedAt: stored.startedAt, restored: stored.cursor > 0 }
+    }
+  }
+
+  // Build fresh
+  let fresh: SessionPlan
+  if (shape === 'era' && id) fresh = await buildEraSession(id, prefs)
+  else if (shape === 'domain' && id) fresh = await buildDomainSession(id as Domain, prefs)
+  else if (shape === 'thread' && id) fresh = await buildThreadSession(id, prefs)
+  else fresh = await buildSpacedSession(prefs)
+
+  const startedAt = now
+  await writeSession(key, {
+    day: 0,
+    items: fresh.items.map(serialiseItem),
+    newCount: fresh.newCount,
+    reviewCount: fresh.reviewCount,
+    cursor: 0,
+    ratings: [],
+    startedAt,
+    updatedAt: startedAt,
+    completed: false,
+  })
+  return { plan: fresh, cursor: 0, ratings: [], startedAt, restored: false }
+}
+
+/** Persist cursor/ratings for a non-daily session mid-run. */
+export async function saveSessionProgress(
+  shape: Exclude<SessionShape, 'daily'>,
+  id: string | null,
+  cursor: number,
+  ratings: RecallRating[],
+): Promise<void> {
+  const key = sessionKey(shape, id)
+  const stored = await readSession(key)
+  if (!stored) return
+  stored.cursor = cursor
+  stored.ratings = ratings
+  stored.updatedAt = Date.now()
+  await writeSession(key, stored)
+}
+
+/** Mark a non-daily session complete so it won't be offered for resume. */
+export async function completeSession(
+  shape: Exclude<SessionShape, 'daily'>,
+  id: string | null,
+): Promise<void> {
+  const key = sessionKey(shape, id)
+  const stored = await readSession(key)
+  if (!stored) return
+  stored.completed = true
+  stored.updatedAt = Date.now()
+  await writeSession(key, stored)
+}
+
+/** Check if there is an in-progress (not expired, not completed) non-daily session. */
+export async function getSessionResume(
+  shape: Exclude<SessionShape, 'daily'>,
+  id: string | null,
+  now = Date.now(),
+): Promise<DailyResume | null> {
+  const key = sessionKey(shape, id)
+  const stored = await readSession(key)
+  if (!stored || stored.completed) return null
+  if (now - stored.updatedAt >= SESSION_TTL_MS) return null
   const total = stored.items.length
   const done = Math.min(stored.cursor, total)
   if (done <= 0 || done >= total) return null

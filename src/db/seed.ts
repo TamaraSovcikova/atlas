@@ -55,6 +55,7 @@ export async function loadSeedIfNeeded(): Promise<void> {
           name: t.name,
           description: t.description,
           displayOrder: t.displayOrder,
+          unit: t.unit,
           members: t.members.map((m) => ({ conceptId: m.concept, tier: m.tier ?? 1 })),
         }
         await db.threads.put(thread)

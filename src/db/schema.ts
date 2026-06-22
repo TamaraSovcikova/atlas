@@ -52,6 +52,7 @@ export interface Thread {
   name: string
   description: string
   displayOrder: number
+  unit?: string
   members: ThreadMember[]
 }
 

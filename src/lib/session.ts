@@ -731,6 +731,7 @@ export interface ThreadSummary {
   threadId: string
   name: string
   description: string
+  unit?: string
   due: number
   newAvailable: number
   lockedNew: number
@@ -753,6 +754,7 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
       threadId: t.id,
       name: t.name,
       description: t.description,
+      unit: t.unit,
       due: 0,
       newAvailable: 0,
       lockedNew: 0,

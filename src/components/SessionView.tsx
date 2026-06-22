@@ -2,14 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { progressSnapshot } from '../lib/progress'
 import {
-  buildDomainSession,
-  buildEraSession,
-  buildSpacedSession,
-  buildThreadSession,
   type SessionItem,
   type SessionPlan,
 } from '../lib/session'
-import { resumeOrBuildDaily, saveDailyProgress, completeDaily } from '../lib/dailyPlan'
+import {
+  resumeOrBuildDaily,
+  saveDailyProgress,
+  completeDaily,
+  resumeOrBuildSession,
+  saveSessionProgress,
+  completeSession,
+} from '../lib/dailyPlan'
 import { applyRating, type RecallRating } from '../lib/fsrs'
 import { db, type Domain, type Era } from '../db/schema'
 import { useSettings } from '../store/useSettings'
@@ -34,6 +37,18 @@ interface Props {
 function primaryConceptId(item: SessionItem): string {
   if (item.kind === 'recall') return item.concept.id
   return item.entries[0]!.concept.id
+}
+
+function sessionId(
+  shape: string,
+  eraId: string | null,
+  domain: Domain | null,
+  threadId: string | null,
+): string | null {
+  if (shape === 'era') return eraId
+  if (shape === 'domain') return domain
+  if (shape === 'thread') return threadId
+  return null
 }
 
 async function recordRating(conceptId: string, rating: RecallRating, now: number) {
@@ -96,23 +111,57 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
         return
       } else if (shape === 'era' && eraId) {
-        p = await buildEraSession(eraId, prefs)
+        const state = await resumeOrBuildSession('era', eraId, prefs)
+        if (cancelled) return
+        p = state.plan
         const e = await db.eras.get(eraId)
         if (!cancelled && e) setEra(e)
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       } else if (shape === 'domain' && domain) {
-        p = await buildDomainSession(domain, prefs)
+        const state = await resumeOrBuildSession('domain', domain, prefs)
+        if (cancelled) return
+        p = state.plan
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       } else if (shape === 'thread' && threadId) {
-        p = await buildThreadSession(threadId, prefs)
+        const state = await resumeOrBuildSession('thread', threadId, prefs)
+        if (cancelled) return
+        p = state.plan
         const t = await db.threads.get(threadId)
         if (!cancelled && t) setThreadName(t.name)
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       } else {
-        p = await buildSpacedSession(prefs)
-      }
-      if (cancelled) return
-      setPlan(p)
-      if (p.items.length === 0) setDone(true)
-      else {
-        setActiveConcept(primaryConceptId(p.items[0]!))
+        const state = await resumeOrBuildSession('spaced', null, prefs)
+        if (cancelled) return
+        p = state.plan
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       }
     }
     load()
@@ -166,9 +215,11 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
           threadId: plan.threadId,
         })
         if (shape === 'daily') await completeDaily()
+        else await completeSession(shape, sessionId(shape, eraId, domain, threadId))
         setDone(true)
       } else {
         if (shape === 'daily') await saveDailyProgress(nextIndex, ratingsRef.current)
+        else await saveSessionProgress(shape, sessionId(shape, eraId, domain, threadId), nextIndex, ratingsRef.current)
         setIndex(nextIndex)
         setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
         setPulseKey(0)

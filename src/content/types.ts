@@ -66,5 +66,7 @@ export interface BankThread {
   name: string
   description: string
   displayOrder: number
+  /** Groups threads into named stages in PathwayView. Threads without a unit float to the end. */
+  unit?: string
   members: BankThreadMember[]
 }
