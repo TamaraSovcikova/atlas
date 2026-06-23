@@ -52,6 +52,11 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           source
         </a>
       )}
+      {variant === 'intro' && (
+        <p className="mt-4 border-t border-white/[0.06] pt-3 text-[11px] text-ink-softer">
+          Read this, then try it below. Getting it wrong the first time is fine — that is how it sticks.
+        </p>
+      )}
     </section>
   )
 }

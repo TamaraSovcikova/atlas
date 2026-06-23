@@ -11,6 +11,9 @@ import { StatsView } from './components/StatsView'
 import { SettingsView } from './components/SettingsView'
 import { SessionView } from './components/SessionView'
 import { ConstellationScreen } from './components/ConstellationScreen'
+import { Onboarding } from './components/Onboarding'
+
+const ONBOARDED_KEY = 'onboarded:v1'
 
 export type SessionConfig =
   | { shape: 'daily' }
@@ -25,6 +28,7 @@ function App() {
   const [tab, setTab] = useState<Tab>('today')
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const loadSettings = useSettings((s) => s.load)
 
   useEffect(() => {
@@ -33,13 +37,22 @@ function App() {
       await db.open()
       await loadSeedIfNeeded()
       await loadSettings()
-      if (!cancelled) setReady(true)
+      const onboarded = await db.settings.get(ONBOARDED_KEY)
+      if (!cancelled) {
+        setShowOnboarding(!onboarded?.value)
+        setReady(true)
+      }
     }
     init()
     return () => {
       cancelled = true
     }
   }, [loadSettings])
+
+  async function finishOnboarding() {
+    await db.settings.put({ key: ONBOARDED_KEY, value: true })
+    setShowOnboarding(false)
+  }
 
   function startSession(config: SessionConfig, returnTo: Tab = tab) {
     setConstellationOpen(false)
@@ -57,6 +70,17 @@ function App() {
       <main className="flex h-full items-center justify-center">
         <p className="animate-pulse text-ink-soft">Loading Atlas…</p>
       </main>
+    )
+  }
+
+  // First-run explainer — full screen, before anything else
+  if (showOnboarding) {
+    return (
+      <MotionProvider>
+        <main className="min-h-full">
+          <Onboarding onDone={finishOnboarding} />
+        </main>
+      </MotionProvider>
     )
   }
 

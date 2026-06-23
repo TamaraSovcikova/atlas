@@ -80,6 +80,17 @@ export function PathwayView({ onStartThread }: Props) {
         </div>
       )}
 
+      {/* All-complete terminal state */}
+      {totalThreads > 0 && doneThreads === totalThreads && (
+        <div className="surface border-good/20 bg-good/[0.04] p-4">
+          <p className="text-sm font-medium text-ink">You have walked the whole pathway.</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-softer">
+            From here it is about keeping it. Your daily session will keep surfacing
+            reviews as concepts come due, and mastery climbs on its own. Nothing more to unlock.
+          </p>
+        </div>
+      )}
+
       {/* Units */}
       <ol className="space-y-8">
         {units.map((unit, unitIdx) => {
@@ -115,6 +126,13 @@ export function PathwayView({ onStartThread }: Props) {
                   </span>
                 )}
               </div>
+
+              {/* Why this unit is locked */}
+              {unitLocked && prevUnit && (
+                <p className="mb-3 -mt-1 pl-9 text-[11px] text-ink-softer">
+                  Finish half of {prevUnit.name} to unlock this unit.
+                </p>
+              )}
 
               {/* Threads in this unit */}
               <ol className="relative space-y-2 pl-9">

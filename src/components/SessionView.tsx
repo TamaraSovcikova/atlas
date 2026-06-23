@@ -344,7 +344,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
             transition={{ ...ease, delay: 0.18 }}
             className="mt-3 text-ink-soft"
           >
-            Nothing due in this slice, and no new concepts queued. Try another shape or come back tomorrow.
+            Nothing is due right now, and no new concepts are unlocked yet. Come back tomorrow, or revisit a story from your pathway.
           </M.p>
         ) : (
           <M.div
