@@ -633,7 +633,14 @@ export async function buildDailySession(
     }
   }
 
-  const combined = [...recall, ...newItems].slice(0, maxCards)
+  // Reserve room for the new concepts before capping. A naive
+  // [...reviews, ...new].slice(0, maxCards) lets a review backlog (>= maxCards
+  // due) consume every slot, so the pathway silently stalls on heavy days and
+  // never advances. Instead, cap reviews to leave the new batch intact: the
+  // Spine keeps moving even when reviews pile up. Overflow reviews stay due and
+  // resurface tomorrow.
+  const reviewBudget = Math.max(0, maxCards - newItems.length)
+  const combined = [...recall.slice(0, reviewBudget), ...newItems]
   const items = injectGames(combined, policy)
   return countPlan(items, 'daily', null, null)
 }
@@ -775,6 +782,18 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
   const conceptById = new Map<string, Concept>()
   for (const c of await db.concepts.toArray()) conceptById.set(c.id, c)
 
+  // Canonical home for each shared concept = the thread with the smallest
+  // displayOrder that lists it. A concept only counts toward its home thread's
+  // completion/mastery, so a later unit can't silently complete itself (and
+  // unlock the next) just because it shares members with an earlier one.
+  // Threads are already ordered by displayOrder, so first writer wins.
+  const homeThread = new Map<string, string>()
+  for (const t of threads) {
+    for (const m of t.members) {
+      if (!homeThread.has(m.conceptId)) homeThread.set(m.conceptId, t.id)
+    }
+  }
+
   return threads.map((t) => {
     const unlockedTiers = computeUnlockedTiers(t.members, conceptById, reviewByConcept)
     const summary: ThreadSummary = {
@@ -791,6 +810,7 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
     }
     const levels: MasteryLevel[] = []
     for (const m of t.members) {
+      if (homeThread.get(m.conceptId) !== t.id) continue
       const concept = conceptById.get(m.conceptId)
       if (!concept) continue
       summary.total++

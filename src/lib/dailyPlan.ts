@@ -206,16 +206,6 @@ export interface DailyResume {
   done: number
 }
 
-/** For Home: how far through today's plan the user is, or null if none active. */
-export async function getDailyResume(now = Date.now()): Promise<DailyResume | null> {
-  const stored = await readStored()
-  if (!stored || stored.day !== dayIndex(now) || stored.completed) return null
-  const total = stored.items.length
-  const done = Math.min(stored.cursor, total)
-  if (done <= 0 || done >= total) return null
-  return { remaining: total - done, total, done }
-}
-
 export type DailyState = 'none' | 'in-progress' | 'done'
 
 export interface DailyStatus {
