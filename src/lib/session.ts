@@ -311,10 +311,11 @@ async function makeRecallItem(
 
 function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
   let items: SessionItem[] = interleave(recall)
-  // Games draw from the whole session pool, new concepts included. Order and
-  // sort cards reveal the correct answer with feedback, so they teach even a
-  // first-seen concept, and this guarantees variety from session one.
-  const poolItems = recall
+  // Games only draw from concepts the user has already met. Asking someone to
+  // chronologically order or sort a concept they first saw seconds ago reads as
+  // a trick question; ordering/sorting is a retrieval exercise, not a teaching
+  // one. New concepts are introduced via their brief + first recall instead.
+  const poolItems = recall.filter((r) => !r.isNew)
 
   if (policy.games.order) {
     const seenYears = new Set<number>()
@@ -340,7 +341,7 @@ function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
 
   if (policy.games.sort) {
     const remaining = items.filter(
-      (it): it is RecallItem => it.kind === 'recall',
+      (it): it is RecallItem => it.kind === 'recall' && !it.isNew,
     )
     const byDomain = new Map<Domain, RecallItem[]>()
     for (const r of remaining) {
@@ -610,8 +611,13 @@ export async function buildDailySession(
     }
   }
 
-  // 3. Fallback: chronological new from anywhere, if threads gave too few.
-  if (newItems.length < maxNew) {
+  // 3. Safety net only: if the pathway has nothing left to unlock (every member
+  // already seen, or every remaining tier still gated), fall back to the next
+  // chronological concept so a user who has exhausted the Spine still gets new
+  // material. While the Spine has anything available, ALL new concepts come from
+  // it — we never top up a partial pathway batch with unrelated chronological
+  // concepts, which is what made the daily feel scattered.
+  if (newItems.length === 0) {
     const chrono = allConcepts
       .filter((c) => c.firstSeenAt === null && !usedIds.has(c.id))
       .sort((a, b) => (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity))
@@ -708,16 +714,24 @@ export async function buildThreadSession(
   return countPlan(items, 'thread', null, null, threadId)
 }
 
-/** Minimum FSRS stability (days) a tier must reach before the next tier unlocks. */
-export const TIER_STABILITY_GATE = 7.0
+/** Minimum FSRS reps a tier must reach before the next tier unlocks (soft pacing). */
+export const TIER_REPS_GATE = 2
 
 /**
  * Compute which tiers are unlocked for a thread given the current concept and
- * review state. Tier 1 is always unlocked; tier N+1 unlocks once all tier-N
- * concepts have been seen AND each has stability >= TIER_STABILITY_GATE.
- * Uses preloaded maps to avoid extra DB round-trips.
+ * review state. Tier 1 is always unlocked; tier N+1 unlocks once every tier-N
+ * concept has been seen AND reviewed at least TIER_REPS_GATE times.
+ *
+ * This is deliberately a *pacing* gate, not a calendar-stability *wall*. The
+ * previous gate required 7 days of FSRS stability per tier, which meant a thread
+ * could never reach met===total (and so never complete, and so never unlock the
+ * next unit) until a week of real time had passed — the "completed pathway that
+ * won't mark complete" bug. Completion is now bounded by how many sessions you
+ * do, not by the calendar: keep showing up and every tier gets introduced within
+ * a few days. Mastery (long-horizon stability) is tracked separately and never
+ * blocks completion. Uses preloaded maps to avoid extra DB round-trips.
  */
-function computeUnlockedTiers(
+export function computeUnlockedTiers(
   members: { conceptId: string; tier: number }[],
   conceptById: Map<string, Concept>,
   reviewByConcept: Map<string, Review>,
@@ -727,23 +741,14 @@ function computeUnlockedTiers(
 
   for (let t = 1; t < maxTier; t++) {
     const tierMembers = members.filter((m) => m.tier === t)
-    const allSeen = tierMembers.every((m) => {
+    const allReady = tierMembers.every((m) => {
       const c = conceptById.get(m.conceptId)
-      return c?.firstSeenAt != null
-    })
-    if (!allSeen) break
-
-    const stabilities = tierMembers.flatMap((m) => {
+      if (!c || c.firstSeenAt == null) return false
       const r = reviewByConcept.get(m.conceptId)
-      return r ? [r.stability] : []
+      return r != null && r.reps >= TIER_REPS_GATE
     })
-    if (stabilities.length < tierMembers.length) break
-
-    if (Math.min(...stabilities) >= TIER_STABILITY_GATE) {
-      unlocked.add(t + 1)
-    } else {
-      break
-    }
+    if (!allReady) break
+    unlocked.add(t + 1)
   }
 
   return unlocked

@@ -216,6 +216,43 @@ export async function getDailyResume(now = Date.now()): Promise<DailyResume | nu
   return { remaining: total - done, total, done }
 }
 
+export type DailyState = 'none' | 'in-progress' | 'done'
+
+export interface DailyStatus {
+  state: DailyState
+  /** Present when state === 'in-progress'. */
+  resume: DailyResume | null
+  /** Present when state === 'done': what today's finished session contained. */
+  doneSummary: { newCount: number; reviewCount: number } | null
+}
+
+/**
+ * Today's daily-session status for Home: not started, mid-session, or finished
+ * for the day. 'done' is terminal until local midnight, so Home shows a
+ * "come back tomorrow" card rather than offering to build a brand-new session
+ * the instant the user finishes (the old behaviour: completing reverted Home to
+ * a fresh "Begin today" that rebuilt a full session on tap).
+ */
+export async function getDailyStatus(now = Date.now()): Promise<DailyStatus> {
+  const stored = await readStored()
+  if (!stored || stored.day !== dayIndex(now)) {
+    return { state: 'none', resume: null, doneSummary: null }
+  }
+  if (stored.completed) {
+    return {
+      state: 'done',
+      resume: null,
+      doneSummary: { newCount: stored.newCount, reviewCount: stored.reviewCount },
+    }
+  }
+  const total = stored.items.length
+  const done = Math.min(stored.cursor, total)
+  if (done > 0 && done < total) {
+    return { state: 'in-progress', resume: { remaining: total - done, total, done }, doneSummary: null }
+  }
+  return { state: 'none', resume: null, doneSummary: null }
+}
+
 // ── Generic non-daily session persistence ─────────────────────────────────
 
 /**

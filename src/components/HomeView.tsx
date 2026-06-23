@@ -4,7 +4,7 @@ import { db, type Review } from '../db/schema'
 import { summariseThreads } from '../lib/session'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { progressSnapshot } from '../lib/progress'
-import { getDailyResume, type DailyResume } from '../lib/dailyPlan'
+import { getDailyStatus, type DailyStatus } from '../lib/dailyPlan'
 import { useSettings } from '../store/useSettings'
 import type { Tab } from './BottomNav'
 import { Button } from './ui/Button'
@@ -14,11 +14,12 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 interface Props {
   onStartDaily: () => void
+  onStartPractice: () => void
   onOpenConstellation: () => void
   onNavigate: (tab: Tab) => void
 }
 
-export function HomeView({ onStartDaily, onOpenConstellation, onNavigate }: Props) {
+export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, onNavigate }: Props) {
   const prefs = useSettings((s) => s.prefs)
 
   const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
@@ -59,11 +60,11 @@ export function HomeView({ onStartDaily, onOpenConstellation, onNavigate }: Prop
   )
 
   const [threadSummaries, setThreadSummaries] = useState<Awaited<ReturnType<typeof summariseThreads>>>([])
-  const [dailyResume, setDailyResume] = useState<DailyResume | null>(null)
+  const [dailyStatus, setDailyStatus] = useState<DailyStatus | null>(null)
 
   useEffect(() => {
     summariseThreads().then(setThreadSummaries)
-    getDailyResume().then(setDailyResume)
+    getDailyStatus().then(setDailyStatus)
   }, [conceptCount, learnedCount, dueNow])
 
   const masteredCount = spread.counts.mastered + spread.counts.known
@@ -114,21 +115,50 @@ export function HomeView({ onStartDaily, onOpenConstellation, onNavigate }: Prop
 
       {/* The one daily action */}
       <div className="surface p-6">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-serif text-xl text-ink">Today's session</h2>
-          <span className="text-xs text-ink-softer">
-            <span className="tabular-nums text-ink-soft">{dueNow ?? 0}</span> due ·{' '}
-            <span className="tabular-nums text-ink-soft">{dueTomorrow ?? 0}</span> tomorrow
-          </span>
-        </div>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          {dailyResume
-            ? `You're ${dailyResume.done} of ${dailyResume.total} through. Pick up where you left off.`
-            : 'Due reviews plus a few new concepts from your pathway — one composed pass, then you\'re done for the day.'}
-        </p>
-        <Button onClick={onStartDaily} className="mt-5 w-full">
-          {dailyResume ? `Continue — ${dailyResume.remaining} left` : 'Begin today'}
-        </Button>
+        {dailyStatus?.state === 'done' ? (
+          <>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-serif text-xl text-ink">Done for today</h2>
+              <span className="text-xs text-ink-softer">
+                <span className="tabular-nums text-ink-soft">{dueTomorrow ?? 0}</span> due tomorrow
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              {dailyStatus.doneSummary
+                ? `You learned ${dailyStatus.doneSummary.newCount} new ${
+                    dailyStatus.doneSummary.newCount === 1 ? 'concept' : 'concepts'
+                  } and reviewed ${dailyStatus.doneSummary.reviewCount}. Come back tomorrow to keep the thread going.`
+                : 'Come back tomorrow to keep the thread going.'}
+            </p>
+            <button
+              type="button"
+              onClick={onStartPractice}
+              className="mt-5 w-full rounded-xl border border-white/10 bg-bg-soft/50 py-2.5 text-sm text-ink-soft transition-colors hover:border-accent/30 hover:text-ink"
+            >
+              Practice more reviews
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-serif text-xl text-ink">Today's session</h2>
+              <span className="text-xs text-ink-softer">
+                <span className="tabular-nums text-ink-soft">{dueNow ?? 0}</span> due ·{' '}
+                <span className="tabular-nums text-ink-soft">{dueTomorrow ?? 0}</span> tomorrow
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              {dailyStatus?.state === 'in-progress' && dailyStatus.resume
+                ? `You're ${dailyStatus.resume.done} of ${dailyStatus.resume.total} through. Pick up where you left off.`
+                : 'Due reviews plus a few new concepts from your pathway — one composed pass, then you\'re done for the day.'}
+            </p>
+            <Button onClick={onStartDaily} className="mt-5 w-full">
+              {dailyStatus?.state === 'in-progress' && dailyStatus.resume
+                ? `Continue — ${dailyStatus.resume.remaining} left`
+                : 'Begin today'}
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Pathway strip */}

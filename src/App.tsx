@@ -110,6 +110,7 @@ function App() {
             {tab === 'today' && (
               <HomeView
                 onStartDaily={() => startSession({ shape: 'daily' }, 'today')}
+                onStartPractice={() => startSession({ shape: 'spaced' }, 'today')}
                 onOpenConstellation={() => setConstellationOpen(true)}
                 onNavigate={setTab}
               />
