@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Drawer } from 'vaul'
-import { db } from '../db/schema'
+import { db, type Thread } from '../db/schema'
+import { masteryOf, MASTERY_META } from '../lib/mastery'
 import { LinkedText } from './LinkedText'
 
 interface Props {
   rootConceptId: string | null
   onClose: () => void
+}
+
+function formatDue(dueAt: number): string {
+  const diff = dueAt - Date.now()
+  const days = Math.round(diff / 86400000)
+  if (days <= 0) return 'Due now'
+  if (days === 1) return 'Due tomorrow'
+  return `Due in ${days}d`
 }
 
 export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
@@ -23,6 +32,25 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
     () => (currentId ? db.concepts.get(currentId) : undefined),
     [currentId],
   )
+
+  const review = useLiveQuery(
+    () => (currentId ? db.reviews.where('conceptId').equals(currentId).first() : undefined),
+    [currentId],
+  )
+
+  const threads = useLiveQuery(
+    () =>
+      currentId
+        ? db.threads
+            .filter((t) => t.members.some((m) => m.conceptId === currentId))
+            .toArray()
+        : Promise.resolve([] as Thread[]),
+    [currentId],
+    [] as Thread[],
+  )
+
+  const mastery = masteryOf(review, concept?.firstSeenAt != null)
+  const masteryMeta = MASTERY_META[mastery]
 
   const canGoBack = fullStack.length > 1
 
@@ -75,6 +103,16 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
           <div className="flex-1 overflow-y-auto px-6 pb-8 pt-1">
             {concept ? (
               <div className="space-y-4">
+                {/* Mastery + due */}
+                {mastery !== 'new' && review && (
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-bg-softer/60 px-2.5 py-0.5 text-[11px] text-ink-soft">
+                      {masteryMeta.label}
+                    </span>
+                    <span className="text-[11px] text-ink-softer">{formatDue(review.dueAt)}</span>
+                  </div>
+                )}
+
                 {concept.imageUrl && (
                   <div className="overflow-hidden rounded-2xl">
                     <img
@@ -91,6 +129,21 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
                 <p className="text-sm leading-relaxed text-ink-soft">
                   <LinkedText text={concept.summary} onConceptClick={drillInto} />
                 </p>
+
+                {/* Thread memberships */}
+                {threads && threads.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {threads.map((t) => (
+                      <span
+                        key={t.id}
+                        className="rounded-full border border-white/[0.07] bg-bg-softer/40 px-2.5 py-0.5 text-[11px] text-ink-softer"
+                      >
+                        {t.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {concept.wikipediaUrl && (
                   <a
                     href={concept.wikipediaUrl}

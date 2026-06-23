@@ -7,6 +7,7 @@ import {
   buildDomainSession,
   buildThreadSession,
   buildSpacedSession,
+  buildMistakesSession,
   type SessionItem,
   type SessionPlan,
   type SortBucket,
@@ -281,6 +282,11 @@ export async function resumeOrBuildSession(
 
   // Build fresh
   let fresh: SessionPlan
+  if (shape === 'mistakes') {
+    // Leeches change with every review — always rebuild, never resume
+    fresh = await buildMistakesSession(prefs)
+    return { plan: fresh, cursor: 0, ratings: [], startedAt: now, restored: false }
+  }
   if (shape === 'era' && id) fresh = await buildEraSession(id, prefs)
   else if (shape === 'domain' && id) fresh = await buildDomainSession(id as Domain, prefs)
   else if (shape === 'thread' && id) fresh = await buildThreadSession(id, prefs)

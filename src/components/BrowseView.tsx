@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Domain, type Era } from '../db/schema'
+import { db, type Concept, type Domain, type Era } from '../db/schema'
 import {
   summariseDomains,
   summariseEras,
@@ -12,6 +12,7 @@ import {
 import { getSessionResume, type DailyResume } from '../lib/dailyPlan'
 import { useSettings } from '../store/useSettings'
 import { Button } from './ui/Button'
+import { ConceptRabbitHole } from './ConceptRabbitHole'
 
 const DOMAIN_LABEL: Record<Domain, string> = {
   history: 'History',
@@ -30,15 +31,23 @@ interface Props {
   onStartDomain: (domain: Domain) => void
   onStartThread: (threadId: string) => void
   onStartSpaced: () => void
+  onStartMistakes: () => void
 }
 
-export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSpaced }: Props) {
+export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSpaced, onStartMistakes }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [shape, setShape] = useState<Shape>('thread')
   const [query, setQuery] = useState('')
+  const [conceptResults, setConceptResults] = useState<Concept[]>([])
+  const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
 
   const eras = useLiveQuery(() => db.eras.orderBy('displayOrder').toArray(), [], [] as Era[])
   const dueNow = useLiveQuery(() => db.reviews.where('dueAt').belowOrEqual(Date.now()).count(), [], 0)
+  const leechCount = useLiveQuery(
+    () => db.reviews.filter((r) => r.failureStreak >= 1).count(),
+    [],
+    0,
+  )
   const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
   const learnedCount = useLiveQuery(
     () => db.concepts.filter((c) => c.firstSeenAt !== null).count(),
@@ -68,6 +77,19 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
   }, [conceptCount, learnedCount, dueNow, prefs])
 
   const q = query.trim().toLowerCase()
+
+  // Concept search — fires when query is at least 2 chars
+  useEffect(() => {
+    if (q.length < 2) {
+      setConceptResults([])
+      return
+    }
+    db.concepts
+      .filter((c) => c.name.toLowerCase().includes(q) || c.summary?.toLowerCase().includes(q))
+      .limit(12)
+      .toArray()
+      .then(setConceptResults)
+  }, [q])
 
   const filteredThreads = useMemo(
     () => (q ? threadSummaries.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) : threadSummaries),
@@ -112,10 +134,30 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search stories, eras, subjects…"
+          placeholder="Search stories, eras, concepts…"
           className="w-full rounded-2xl border border-white/[0.08] bg-bg-soft py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-softer focus:border-accent/40 focus:outline-none"
         />
       </div>
+
+      {/* Concept results — shown when query is long enough */}
+      {q.length >= 2 && conceptResults.length > 0 && (
+        <div>
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-softer">Concepts</p>
+          <ul className="flex flex-wrap gap-2">
+            {conceptResults.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => setRabbitHoleId(c.id)}
+                  className="rounded-full border border-white/[0.07] bg-bg-soft/60 px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-accent/40 hover:text-ink active:scale-[0.97]"
+                >
+                  {c.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Shape tabs */}
       <nav className="grid grid-cols-4 gap-1.5">
@@ -233,17 +275,40 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
       )}
 
       {shape === 'spaced' && (
-        <div className="surface p-6">
-          <h3 className="font-serif text-lg text-ink">Just the reviews</h3>
-          <p className="mt-2 text-sm text-ink-soft">
-            Whatever the spaced-repetition scheduler says is due, interleaved in one pass. No new
-            material — use this when you want to keep what you already have.
-          </p>
-          <Button onClick={onStartSpaced} disabled={(dueNow ?? 0) === 0} className="mt-5">
-            {(dueNow ?? 0) > 0 ? `Start — ${dueNow} due` : 'Nothing due right now'}
-          </Button>
+        <div className="space-y-3">
+          <div className="surface p-6">
+            <h3 className="font-serif text-lg text-ink">Just the reviews</h3>
+            <p className="mt-2 text-sm text-ink-soft">
+              Whatever the spaced-repetition scheduler says is due, interleaved in one pass. No new
+              material — use this when you want to keep what you already have.
+            </p>
+            <Button onClick={onStartSpaced} disabled={(dueNow ?? 0) === 0} className="mt-5">
+              {(dueNow ?? 0) > 0 ? `Start — ${dueNow} due` : 'Nothing due right now'}
+            </Button>
+          </div>
+
+          {(leechCount ?? 0) > 0 && (
+            <div className="surface p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-serif text-lg text-ink">Struggling concepts</h3>
+                  <p className="mt-1.5 text-sm text-ink-soft">
+                    {leechCount} concept{leechCount === 1 ? '' : 's'} with recent failures. A focused pass to break the pattern.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-red-500/15 px-2.5 py-0.5 text-[11px] font-medium text-red-400">
+                  {leechCount}
+                </span>
+              </div>
+              <Button onClick={onStartMistakes} className="mt-5">
+                Review struggling concepts
+              </Button>
+            </div>
+          )}
         </div>
       )}
+
+      <ConceptRabbitHole rootConceptId={rabbitHoleId} onClose={() => setRabbitHoleId(null)} />
     </section>
   )
 }

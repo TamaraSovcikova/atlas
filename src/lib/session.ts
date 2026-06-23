@@ -521,6 +521,28 @@ export async function buildSpacedSession(
  * concepts if the threads have nothing unlocked. The result is interleaved by
  * domain and games are injected, exactly like the other shapes.
  */
+export async function buildMistakesSession(
+  prefs: Prefs,
+  options: BuildOptions = {},
+): Promise<SessionPlan> {
+  const policy = resolvePolicy(prefs)
+  const maxCards = options.maxCards ?? DEFAULT_MAX_CARDS
+  const recall: RecallItem[] = []
+  let rot = 0
+  const struggling = await db.reviews.filter((r) => r.failureStreak >= 1).toArray()
+  // Sort by worst streak first so the most troublesome concepts come up early
+  struggling.sort((a, b) => b.failureStreak - a.failureStreak)
+  for (const review of struggling) {
+    const concept = await db.concepts.get(review.conceptId)
+    if (!concept) continue
+    const item = await makeRecallItem(concept, review, false, policy, 'review', rot++)
+    if (item) recall.push(item)
+  }
+  const limited = recall.slice(0, maxCards)
+  const items = injectGames(limited, policy)
+  return countPlan(items, 'mistakes', null, null)
+}
+
 export async function buildDailySession(
   prefs: Prefs,
   now = Date.now(),

@@ -26,12 +26,19 @@ import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
 
 interface Props {
-  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily'
+  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes'
   eraId: string | null
   domain: Domain | null
   threadId: string | null
   onFinished: () => void
   onCancel: () => void
+}
+
+interface UndoSnapshot {
+  index: number
+  ratings: RecallRating[]
+  conceptId: string
+  prevReview: Record<string, unknown>
 }
 
 function primaryConceptId(item: SessionItem): string {
@@ -91,6 +98,8 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
   const [revealedRating, setRevealedRating] = useState<RecallRating | null | undefined>(undefined)
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
   const [swipeDir, setSwipeDir] = useState<SwipeDir>(null)
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const allSessions = useLiveQuery(() => db.sessions.toArray(), [], [])
 
   useEffect(() => {
@@ -150,6 +159,18 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         if (p.items.length === 0) setDone(true)
         else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
         return
+      } else if (shape === 'mistakes') {
+        const state = await resumeOrBuildSession('mistakes', null, prefs)
+        if (cancelled) return
+        p = state.plan
+        ratingsRef.current = state.ratings
+        setRatings(state.ratings)
+        setStartedAt(state.startedAt)
+        setIndex(Math.min(state.cursor, Math.max(0, p.items.length - 1)))
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
+        return
       } else {
         const state = await resumeOrBuildSession('spaced', null, prefs)
         if (cancelled) return
@@ -190,6 +211,19 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     async (results: { conceptId: string; rating: RecallRating }[]) => {
       if (!plan) return
       const now = Date.now()
+      // Snapshot for undo — only for single-card recall (not games with multiple results)
+      let newSnapshot: UndoSnapshot | null = null
+      if (results.length === 1) {
+        const prevReview = await db.reviews.where('conceptId').equals(results[0]!.conceptId).first()
+        if (prevReview) {
+          newSnapshot = {
+            index,
+            ratings: [...ratingsRef.current],
+            conceptId: results[0]!.conceptId,
+            prevReview: { ...prevReview } as Record<string, unknown>,
+          }
+        }
+      }
       for (const r of results) {
         await recordRating(r.conceptId, r.rating, now)
       }
@@ -223,10 +257,37 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         setIndex(nextIndex)
         setActiveConcept(primaryConceptId(plan.items[nextIndex]!))
         setPulseKey(0)
+        // Show undo for 8 seconds then clear
+        if (newSnapshot) {
+          if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+          setUndoSnapshot(newSnapshot)
+          undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 8000)
+        } else {
+          setUndoSnapshot(null)
+        }
       }
     },
     [plan, index, startedAt, shape],
   )
+
+  const handleUndo = useCallback(async () => {
+    if (!undoSnapshot || !plan) return
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setUndoSnapshot(null)
+    // Restore the DB review to its pre-rating state
+    const { conceptId, prevReview, index: prevIndex, ratings: prevRatings } = undoSnapshot
+    const review = await db.reviews.where('conceptId').equals(conceptId).first()
+    if (review) {
+      await db.reviews.update(review.id!, prevReview as Parameters<typeof db.reviews.update>[1])
+    }
+    ratingsRef.current = prevRatings
+    setRatings(prevRatings)
+    setIndex(prevIndex)
+    setActiveConcept(primaryConceptId(plan.items[prevIndex]!))
+    setPulseKey(0)
+    if (shape === 'daily') await saveDailyProgress(prevIndex, prevRatings)
+    else await saveSessionProgress(shape, sessionId(shape, eraId, domain, threadId), prevIndex, prevRatings)
+  }, [undoSnapshot, plan, shape, eraId, domain, threadId])
 
   const handleRevealed = useCallback((rating: RecallRating | null) => {
     setRevealedRating(rating)
@@ -356,14 +417,30 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
               <span className="text-ink-soft">{threadName}</span>
             )}
             {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
+            {shape === 'mistakes' && <span className="text-ink-soft">Struggling concepts</span>}
             {shape === 'daily' && <span className="text-ink-soft">Today</span>}
             <span className="ml-3">
               {index + 1} of {plan.items.length}
             </span>
           </div>
-          <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
-            End session
-          </button>
+          <div className="flex items-center gap-3">
+            {undoSnapshot && (
+              <button
+                type="button"
+                onClick={handleUndo}
+                className="flex items-center gap-1 rounded-full border border-white/10 bg-bg-soft px-2.5 py-1 text-ink-soft hover:border-accent/40 hover:text-ink"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M9 14 4 9l5-5" />
+                  <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                </svg>
+                Undo
+              </button>
+            )}
+            <button type="button" onClick={onCancel} className="text-ink-softer hover:text-ink">
+              End session
+            </button>
+          </div>
         </div>
 
         {/* Segmented progress dots */}
@@ -401,6 +478,13 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
             transition={cardTransition}
             className="relative surface overflow-hidden"
           >
+            {/* Leech indicator */}
+            {isRecallCard && current.review.failureStreak >= 3 && (
+              <div className="flex items-center gap-1.5 border-b border-white/[0.05] px-6 py-2">
+                <span className="text-[10px]">⚠</span>
+                <span className="text-[10px] uppercase tracking-wider text-ink-softer">This one keeps slipping</span>
+              </div>
+            )}
             {/* Scrollable card content */}
             <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(55svh)' }}>
               {isRecallCard && (

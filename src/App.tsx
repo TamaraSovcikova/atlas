@@ -18,6 +18,7 @@ export type SessionConfig =
   | { shape: 'domain'; domain: Domain }
   | { shape: 'thread'; threadId: string }
   | { shape: 'spaced' }
+  | { shape: 'mistakes' }
 
 function App() {
   const [ready, setReady] = useState(false)
@@ -124,6 +125,7 @@ function App() {
                 onStartDomain={(domain) => startSession({ shape: 'domain', domain }, 'browse')}
                 onStartThread={(threadId) => startSession({ shape: 'thread', threadId }, 'browse')}
                 onStartSpaced={() => startSession({ shape: 'spaced' }, 'browse')}
+                onStartMistakes={() => startSession({ shape: 'mistakes' }, 'browse')}
               />
             )}
             {tab === 'stats' && <StatsView />}
