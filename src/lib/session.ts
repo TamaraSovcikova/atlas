@@ -837,6 +837,34 @@ export interface EraSummary {
   total: number
 }
 
+/**
+ * Returns the first concept in the pathway that the user has never seen, along
+ * with the thread name it belongs to. Used by the Story Brief feed card to
+ * preview what's coming up next.
+ */
+export async function getNextPathwayConcept(): Promise<{
+  concept: Concept
+  threadName: string
+} | null> {
+  const threads = await db.threads.orderBy('displayOrder').toArray()
+  const reviewByConcept = new Map<string, Review>()
+  for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
+  const conceptById = new Map<string, Concept>()
+  for (const c of await db.concepts.toArray()) conceptById.set(c.id, c)
+
+  for (const thread of threads) {
+    const unlocked = computeUnlockedTiers(thread.members, conceptById, reviewByConcept)
+    const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
+    for (const member of thread.members) {
+      const concept = conceptById.get(member.conceptId)
+      if (concept && concept.firstSeenAt === null && unlocked.has(tierByConcept.get(member.conceptId) ?? 1)) {
+        return { concept, threadName: thread.name }
+      }
+    }
+  }
+  return null
+}
+
 export async function summariseEras(now = Date.now()): Promise<Map<string, EraSummary>> {
   const eras = await db.eras.toArray()
   const summaries = new Map<string, EraSummary>()

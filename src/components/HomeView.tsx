@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Review } from '../db/schema'
-import { summariseThreads } from '../lib/session'
+import { db, type Review, type Concept } from '../db/schema'
+import { summariseThreads, getNextPathwayConcept } from '../lib/session'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { progressSnapshot } from '../lib/progress'
 import { getDailyStatus, type DailyStatus } from '../lib/dailyPlan'
@@ -12,14 +12,20 @@ import { ConstellationPreview } from './ConstellationPreview'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
+function firstSentence(text: string): string {
+  const idx = text.indexOf('. ')
+  return idx > 0 ? text.slice(0, idx + 1) : text
+}
+
 interface Props {
   onStartDaily: () => void
   onStartPractice: () => void
   onOpenConstellation: () => void
   onNavigate: (tab: Tab) => void
+  onOpenStoryBrief: (concept: Concept, threadName: string) => void
 }
 
-export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, onNavigate }: Props) {
+export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, onNavigate, onOpenStoryBrief }: Props) {
   const prefs = useSettings((s) => s.prefs)
 
   const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
@@ -61,10 +67,12 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
 
   const [threadSummaries, setThreadSummaries] = useState<Awaited<ReturnType<typeof summariseThreads>>>([])
   const [dailyStatus, setDailyStatus] = useState<DailyStatus | null>(null)
+  const [nextConcept, setNextConcept] = useState<{ concept: Concept; threadName: string } | null>(null)
 
   useEffect(() => {
     summariseThreads().then(setThreadSummaries)
     getDailyStatus().then(setDailyStatus)
+    getNextPathwayConcept().then(setNextConcept)
   }, [conceptCount, learnedCount, dueNow])
 
   const masteredCount = spread.counts.mastered + spread.counts.known
@@ -160,6 +168,29 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
           </>
         )}
       </div>
+
+      {/* Story preview card — next concept waiting in the pathway */}
+      {nextConcept && dailyStatus?.state !== 'done' && (
+        <button
+          type="button"
+          onClick={() => onOpenStoryBrief(nextConcept.concept, nextConcept.threadName)}
+          className="group w-full rounded-2xl border border-ink/[0.08] bg-bg-soft p-5 text-left shadow-card transition-all hover:border-accent/30 active:scale-[0.99]"
+        >
+          <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">
+            Coming up · {nextConcept.threadName}
+          </p>
+          <h3 className="mt-2 font-serif text-xl text-ink">{nextConcept.concept.name}</h3>
+          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">
+            {firstSentence(nextConcept.concept.summary)}
+          </p>
+          <div className="mt-4 flex items-center gap-1.5 text-accent">
+            <span className="text-sm font-medium">Read the story brief</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </div>
+        </button>
+      )}
 
       {/* Pathway strip */}
       {threadSummaries.length > 0 && (() => {

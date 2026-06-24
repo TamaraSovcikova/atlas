@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { db, type Domain } from './db/schema'
+import { db, type Domain, type Concept } from './db/schema'
 import { loadSeedIfNeeded } from './db/seed'
 import { useSettings } from './store/useSettings'
 import { MotionProvider } from './components/ui/motion'
 import { BottomNav, type Tab } from './components/BottomNav'
 import { HomeView } from './components/HomeView'
+import { StoryBrief } from './components/StoryBrief'
 import { BrowseView } from './components/BrowseView'
 import { PathwayView } from './components/PathwayView'
 import { StatsView } from './components/StatsView'
@@ -38,6 +39,7 @@ function App() {
   const [youPanel, setYouPanel] = useState<YouPanel>('progress')
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
+  const [storyBriefData, setStoryBriefData] = useState<{ concept: Concept; threadName: string } | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const loadSettings = useSettings((s) => s.load)
@@ -172,6 +174,25 @@ function App() {
     )
   }
 
+  // Story Brief overlay — full screen, no bottom nav
+  if (storyBriefData) {
+    return (
+      <MotionProvider>
+        <main className="h-full">
+          <StoryBrief
+            concept={storyBriefData.concept}
+            threadName={storyBriefData.threadName}
+            onStart={() => {
+              setStoryBriefData(null)
+              startSession({ shape: 'daily' }, 'feed')
+            }}
+            onClose={() => setStoryBriefData(null)}
+          />
+        </main>
+      </MotionProvider>
+    )
+  }
+
   // Constellation overlay — full screen, no bottom nav
   if (constellationOpen) {
     return (
@@ -206,6 +227,7 @@ function App() {
                 onStartPractice={() => startSession({ shape: 'spaced' }, 'feed')}
                 onOpenConstellation={() => setConstellationOpen(true)}
                 onNavigate={setTab}
+                onOpenStoryBrief={(concept, threadName) => setStoryBriefData({ concept, threadName })}
               />
             )}
             {tab === 'atlas' && (
