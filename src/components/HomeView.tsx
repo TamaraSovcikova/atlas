@@ -77,20 +77,20 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
           label="day streak"
           value={snapshot.streak}
           glyph="🔥"
-          onClick={() => onNavigate('stats')}
+          onClick={() => onNavigate('you')}
           accent={snapshot.streak > 0}
         />
         <GoalChip
           fraction={snapshot.goalFraction}
           done={snapshot.todayCards}
           goal={snapshot.goalCards}
-          onClick={() => onNavigate('stats')}
+          onClick={() => onNavigate('you')}
         />
         <StatChip
           label="bright stars"
           value={masteredCount}
           glyph="✦"
-          onClick={() => onNavigate('stats')}
+          onClick={() => onNavigate('you')}
           accent={masteredCount > 0}
         />
       </div>
@@ -99,7 +99,7 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
       <button
         type="button"
         onClick={onOpenConstellation}
-        className="group w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card transition-all hover:border-accent/30 active:scale-[0.995]"
+        className="group w-full overflow-hidden rounded-2xl border border-ink/[0.08] bg-bg-soft shadow-card transition-all hover:border-accent/30 active:scale-[0.995]"
       >
         <ConstellationPreview height={220} />
         <div className="flex items-center justify-between px-5 pb-3 pt-1">
@@ -133,7 +133,7 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
             <button
               type="button"
               onClick={onStartPractice}
-              className="mt-5 w-full rounded-xl border border-white/10 bg-bg-soft/50 py-2.5 text-sm text-ink-soft transition-colors hover:border-accent/30 hover:text-ink"
+              className="mt-5 w-full rounded-xl border border-ink/[0.08] bg-bg-softer py-2.5 text-sm text-ink-soft transition-colors hover:border-accent/30 hover:text-ink"
             >
               Practice more reviews
             </button>
@@ -150,7 +150,7 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               {dailyStatus?.state === 'in-progress' && dailyStatus.resume
                 ? `You're ${dailyStatus.resume.done} of ${dailyStatus.resume.total} through. Pick up where you left off.`
-                : 'Due reviews plus a few new concepts from your pathway — one composed pass, then you\'re done for the day.'}
+                : "Due reviews plus a few new concepts from your pathway — one composed pass, then you're done for the day."}
             </p>
             <Button onClick={onStartDaily} className="mt-5 w-full">
               {dailyStatus?.state === 'in-progress' && dailyStatus.resume
@@ -168,8 +168,8 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
         return (
           <button
             type="button"
-            onClick={() => onNavigate('pathway')}
-            className="group flex w-full items-center gap-4 rounded-2xl border border-white/[0.07] bg-bg-soft/50 p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99]"
+            onClick={() => onNavigate('atlas')}
+            className="group flex w-full items-center gap-4 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99]"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -246,7 +246,7 @@ function StatChip({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center gap-0.5 rounded-2xl border border-white/[0.06] bg-bg-soft/50 px-2 py-3 transition-colors hover:border-accent/30"
+      className="flex flex-col items-center gap-0.5 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-3 transition-colors hover:border-accent/30"
     >
       <span className="text-lg leading-none">{glyph}</span>
       <span className={`text-xl font-semibold tabular-nums ${accent ? 'text-accent' : 'text-ink'}`}>
@@ -275,16 +275,16 @@ function GoalChip({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center gap-0.5 rounded-2xl border border-white/[0.06] bg-bg-soft/50 px-2 py-3 transition-colors hover:border-accent/30"
+      className="flex flex-col items-center gap-0.5 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-3 transition-colors hover:border-accent/30"
     >
       <svg width="40" height="40" viewBox="0 0 40 40" className="-mb-0.5">
-        <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+        <circle cx="20" cy="20" r={r} fill="none" className="stroke-ink/[0.12]" strokeWidth="4" />
         <circle
           cx="20"
           cy="20"
           r={r}
           fill="none"
-          stroke={met ? '#4ade80' : '#fbbf24'}
+          stroke={met ? '#4ade80' : '#28486B'}
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={c}

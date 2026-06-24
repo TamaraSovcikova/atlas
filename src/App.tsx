@@ -28,9 +28,14 @@ export type SessionConfig =
   | { shape: 'spaced' }
   | { shape: 'mistakes' }
 
+type AtlasPanel = 'pathway' | 'browse'
+type YouPanel = 'progress' | 'settings'
+
 function App() {
   const [ready, setReady] = useState(false)
-  const [tab, setTab] = useState<Tab>('today')
+  const [tab, setTab] = useState<Tab>('feed')
+  const [atlasPanel, setAtlasPanel] = useState<AtlasPanel>('pathway')
+  const [youPanel, setYouPanel] = useState<YouPanel>('progress')
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -61,9 +66,13 @@ function App() {
     setShowOnboarding(false)
   }
 
-  // Apply the visual theme to <html> so CSS variables switch palette.
+  // Apply theme: paper is the default (:root), dark navy is the override.
   useEffect(() => {
-    document.documentElement.dataset.theme = prefs.theme
+    if (prefs.theme === 'dark') {
+      document.documentElement.dataset.theme = 'dark'
+    } else {
+      delete document.documentElement.dataset.theme
+    }
   }, [prefs.theme])
 
   // Capture the install prompt so Settings can offer "Install Atlas".
@@ -82,7 +91,7 @@ function App() {
     setInstallPrompt(null)
   }
 
-  // Badge the installed app icon with the count of due reviews (met concepts).
+  // Badge the installed app icon with the count of due reviews.
   useEffect(() => {
     let active = true
     const nav = navigator as Navigator & {
@@ -120,7 +129,7 @@ function App() {
   }
 
   function endSession() {
-    const returnTo = session?.returnTo ?? 'today'
+    const returnTo = session?.returnTo ?? 'feed'
     setSession(null)
     setTab(returnTo)
   }
@@ -177,11 +186,11 @@ function App() {
   return (
     <MotionProvider>
       <div className="flex h-full flex-col">
-        {/* Compact top bar */}
-        <header className="flex-none border-b border-white/[0.04] bg-bg px-5 py-3">
+        {/* Editorial header */}
+        <header className="flex-none border-b border-ink/[0.08] bg-bg px-5 py-3">
           <div className="mx-auto flex max-w-2xl items-center">
-            <button type="button" onClick={() => setTab('today')} className="text-left">
-              <h1 className="bg-accent-grad bg-clip-text font-serif text-2xl font-semibold tracking-tight text-transparent">
+            <button type="button" onClick={() => setTab('feed')} className="text-left">
+              <h1 className="font-serif text-2xl font-semibold tracking-tight text-accent">
                 Atlas
               </h1>
             </button>
@@ -191,31 +200,61 @@ function App() {
         {/* Scrollable tab content */}
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl px-5 py-6">
-            {tab === 'today' && (
+            {tab === 'feed' && (
               <HomeView
-                onStartDaily={() => startSession({ shape: 'daily' }, 'today')}
-                onStartPractice={() => startSession({ shape: 'spaced' }, 'today')}
+                onStartDaily={() => startSession({ shape: 'daily' }, 'feed')}
+                onStartPractice={() => startSession({ shape: 'spaced' }, 'feed')}
                 onOpenConstellation={() => setConstellationOpen(true)}
                 onNavigate={setTab}
               />
             )}
-            {tab === 'pathway' && (
-              <PathwayView
-                onStartThread={(threadId) => startSession({ shape: 'thread', threadId }, 'pathway')}
-              />
+            {tab === 'atlas' && (
+              <div className="space-y-5">
+                <SegmentControl
+                  options={[
+                    { key: 'pathway' as AtlasPanel, label: 'Pathway' },
+                    { key: 'browse' as AtlasPanel, label: 'Browse' },
+                  ]}
+                  active={atlasPanel}
+                  onChange={setAtlasPanel}
+                />
+                {atlasPanel === 'pathway' && (
+                  <PathwayView
+                    onStartThread={(threadId) =>
+                      startSession({ shape: 'thread', threadId }, 'atlas')
+                    }
+                  />
+                )}
+                {atlasPanel === 'browse' && (
+                  <BrowseView
+                    onStartEra={(eraId) => startSession({ shape: 'era', eraId }, 'atlas')}
+                    onStartDomain={(domain) =>
+                      startSession({ shape: 'domain', domain }, 'atlas')
+                    }
+                    onStartThread={(threadId) =>
+                      startSession({ shape: 'thread', threadId }, 'atlas')
+                    }
+                    onStartSpaced={() => startSession({ shape: 'spaced' }, 'atlas')}
+                    onStartMistakes={() => startSession({ shape: 'mistakes' }, 'atlas')}
+                  />
+                )}
+              </div>
             )}
-            {tab === 'browse' && (
-              <BrowseView
-                onStartEra={(eraId) => startSession({ shape: 'era', eraId }, 'browse')}
-                onStartDomain={(domain) => startSession({ shape: 'domain', domain }, 'browse')}
-                onStartThread={(threadId) => startSession({ shape: 'thread', threadId }, 'browse')}
-                onStartSpaced={() => startSession({ shape: 'spaced' }, 'browse')}
-                onStartMistakes={() => startSession({ shape: 'mistakes' }, 'browse')}
-              />
-            )}
-            {tab === 'stats' && <StatsView />}
-            {tab === 'settings' && (
-              <SettingsView canInstall={!!installPrompt} onInstall={promptInstall} />
+            {tab === 'you' && (
+              <div className="space-y-5">
+                <SegmentControl
+                  options={[
+                    { key: 'progress' as YouPanel, label: 'Progress' },
+                    { key: 'settings' as YouPanel, label: 'Settings' },
+                  ]}
+                  active={youPanel}
+                  onChange={setYouPanel}
+                />
+                {youPanel === 'progress' && <StatsView />}
+                {youPanel === 'settings' && (
+                  <SettingsView canInstall={!!installPrompt} onInstall={promptInstall} />
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -223,6 +262,35 @@ function App() {
         <BottomNav active={tab} onChange={setTab} />
       </div>
     </MotionProvider>
+  )
+}
+
+function SegmentControl<T extends string>({
+  options,
+  active,
+  onChange,
+}: {
+  options: { key: T; label: string }[]
+  active: T
+  onChange: (key: T) => void
+}) {
+  return (
+    <div className="flex rounded-xl p-1" style={{ border: '1px solid rgb(var(--ink) / 0.08)', backgroundColor: 'rgb(var(--bg-softer))' }}>
+      {options.map((opt) => (
+        <button
+          key={opt.key}
+          type="button"
+          onClick={() => onChange(opt.key)}
+          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+            active === opt.key
+              ? 'bg-bg-raised text-ink shadow-card'
+              : 'text-ink-softer hover:text-ink-soft'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
   )
 }
 

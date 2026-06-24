@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm Observatory palette, themeable via CSS variables (see index.css).
+        // Editorial paper palette, themeable via CSS variables (see index.css).
         bg: {
           DEFAULT: 'rgb(var(--bg) / <alpha-value>)',
           soft: 'rgb(var(--bg-soft) / <alpha-value>)',
@@ -16,18 +16,17 @@ export default {
           soft: 'rgb(var(--ink-soft) / <alpha-value>)',
           softer: 'rgb(var(--ink-softer) / <alpha-value>)',
         },
-        // Amber: the one saturated accent. Domain hues live only in Constellation.
+        // Deep blue: the one saturated accent.
         accent: {
-          DEFAULT: '#fbbf24',
-          soft: '#fcd34d',
-          deep: '#d99413',
-          glow: 'rgba(251, 191, 36, 0.3)',
+          DEFAULT: '#28486B',
+          soft: '#3a6090',
+          deep: '#1c3350',
+          glow: 'rgba(40, 72, 107, 0.3)',
         },
         good: '#4ade80',
         bad: '#f87171',
-        // Fixed dark for text/icons sitting on the amber accent. Theme-independent
-        // (the accent stays amber in both themes), so it must not follow --bg.
-        'on-accent': '#1a1410',
+        // Fixed light for text/icons on the deep-blue accent (theme-independent).
+        'on-accent': '#F6F2EA',
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
@@ -39,12 +38,13 @@ export default {
         '3xl': '1.75rem',
       },
       boxShadow: {
-        card: '0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 30px -12px rgba(0,0,0,0.7)',
-        raised: '0 1px 0 0 rgba(255,255,255,0.06) inset, 0 12px 40px -10px rgba(0,0,0,0.8)',
-        glow: '0 0 0 1px rgba(251,191,36,0.4), 0 0 28px -4px rgba(251,191,36,0.45)',
+        // Theme-aware shadows defined as CSS variables in index.css.
+        card: 'var(--shadow-card)',
+        raised: 'var(--shadow-raised)',
+        glow: 'var(--shadow-glow)',
       },
       backgroundImage: {
-        'accent-grad': 'linear-gradient(135deg, #fcd34d 0%, #fbbf24 45%, #d99413 100%)',
+        'accent-grad': 'linear-gradient(135deg, #3a6090 0%, #28486B 45%, #1c3350 100%)',
         'surface-grad': 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 60%)',
       },
       keyframes: {

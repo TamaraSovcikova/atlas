@@ -11,7 +11,7 @@ export function Button({ variant = 'primary', className = '', children, ...rest 
   const styles = {
     primary: 'bg-accent-grad text-on-accent shadow-glow',
     ghost: 'text-ink-soft hover:text-ink',
-    soft: 'border border-white/10 bg-bg-raised text-ink hover:border-accent/50',
+    soft: 'border border-ink/[0.10] bg-bg-raised text-ink hover:border-accent/50',
   }[variant]
   return (
     <button className={`${base} ${styles} ${className}`} {...rest}>

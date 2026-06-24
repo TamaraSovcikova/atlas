@@ -71,30 +71,35 @@
 @tailwind utilities;
 
 @layer base {
-  /* Themeable palette. Tailwind colors reference these via rgb(var(--x)). */
+  /* Editorial paper palette. Paper is the default; dark navy is the override. */
   :root {
-    --bg: 26 20 16;
-    --bg-soft: 34 28 21;
-    --bg-softer: 44 37 27;
-    --bg-raised: 55 46 34;
-    --ink: 244 238 223;
-    --ink-soft: 197 184 156;
-    --ink-softer: 133 117 104;
-    /* Hairlines and shadows tuned per theme. */
-    --bloom: rgba(215, 148, 36, 0.07);
-    --grain-opacity: 1;
+    --bg: 246 242 234;           /* paper #F6F2EA */
+    --bg-soft: 253 250 245;      /* near-white */
+    --bg-softer: 237 231 220;    /* warm gray */
+    --bg-raised: 255 255 255;    /* white card surface */
+    --ink: 34 29 22;             /* ink #221D16 */
+    --ink-soft: 80 68 54;        /* warm medium */
+    --ink-softer: 140 124 106;   /* warm soft */
+    --bloom: rgba(40, 72, 107, 0.05);
+    --grain-opacity: 0.2;
+    --shadow-card: 0 1px 2px rgba(34,29,22,0.04), 0 4px 16px -6px rgba(34,29,22,0.12);
+    --shadow-raised: 0 1px 2px rgba(34,29,22,0.05), 0 6px 20px -8px rgba(34,29,22,0.15);
+    --shadow-glow: 0 0 0 1px rgba(40,72,107,0.2), 0 0 20px -4px rgba(40,72,107,0.25);
   }
 
-  :root[data-theme='light'] {
-    --bg: 247 243 235;
-    --bg-soft: 255 252 246;
-    --bg-softer: 238 231 219;
-    --bg-raised: 255 255 255;
-    --ink: 40 32 24;
-    --ink-soft: 92 80 66;
-    --ink-softer: 140 124 106;
-    --bloom: rgba(215, 148, 36, 0.1);
-    --grain-opacity: 0.4;
+  :root[data-theme='dark'] {
+    --bg: 16 20 28;              /* deep navy */
+    --bg-soft: 22 28 40;
+    --bg-softer: 30 38 54;
+    --bg-raised: 40 50 70;
+    --ink: 228 234 242;          /* cool near-white */
+    --ink-soft: 160 176 198;     /* cool medium */
+    --ink-softer: 96 112 136;    /* muted blue-gray */
+    --bloom: rgba(40, 72, 107, 0.25);
+    --grain-opacity: 0.6;
+    --shadow-card: 0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 30px -12px rgba(0,0,0,0.7);
+    --shadow-raised: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 12px 40px -10px rgba(0,0,0,0.8);
+    --shadow-glow: 0 0 0 1px rgba(40,72,107,0.4), 0 0 28px -4px rgba(40,72,107,0.45);
   }
 
   html,
@@ -105,8 +110,7 @@
 
   body {
     background-color: rgb(var(--bg));
-    /* Single warm amber bloom near the top -- observatory lamp quality */
-    background-image: radial-gradient(ellipse 1000px 600px at 50% -8%, var(--bloom), transparent 65%);
+    background-image: radial-gradient(ellipse 1000px 500px at 50% -8%, var(--bloom), transparent 65%);
     background-attachment: fixed;
     -webkit-tap-highlight-color: transparent;
   }
@@ -135,30 +139,29 @@
 }
 
 @layer components {
+  /* Paper-first surfaces: ink-toned hairline borders, soft paper shadow. */
   .surface {
-    @apply rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card;
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 60%);
+    @apply rounded-2xl bg-bg-soft shadow-card;
+    border: 1px solid rgb(var(--ink) / 0.08);
   }
   .surface-raised {
-    @apply rounded-2xl border border-white/[0.09] bg-bg-softer shadow-raised;
+    @apply rounded-2xl bg-bg-softer shadow-raised;
+    border: 1px solid rgb(var(--ink) / 0.10);
   }
   .chip {
-    @apply rounded-full border border-white/10 bg-bg-raised px-4 py-2 text-sm text-ink transition-all active:scale-95;
+    @apply rounded-full bg-bg-raised px-4 py-2 text-sm text-ink transition-all active:scale-95;
+    border: 1px solid rgb(var(--ink) / 0.10);
   }
 
-  /* Light theme: the dark-tuned white hairlines and heavy shadows read wrong on
-     a pale background, so retune the shared surfaces to ink-toned borders and
-     softer shadows. */
-  :root[data-theme='light'] .surface {
-    border-color: rgba(40, 32, 24, 0.1);
-    box-shadow: 0 1px 2px rgba(40, 32, 24, 0.04), 0 8px 24px -16px rgba(40, 32, 24, 0.25);
-    background-image: none;
+  /* Dark theme: white hairlines and inner gloss replace ink-toned borders. */
+  :root[data-theme='dark'] .surface {
+    border-color: rgba(255, 255, 255, 0.07);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 60%);
   }
-  :root[data-theme='light'] .surface-raised {
-    border-color: rgba(40, 32, 24, 0.12);
-    box-shadow: 0 1px 2px rgba(40, 32, 24, 0.05), 0 12px 32px -14px rgba(40, 32, 24, 0.3);
+  :root[data-theme='dark'] .surface-raised {
+    border-color: rgba(255, 255, 255, 0.09);
   }
-  :root[data-theme='light'] .chip {
-    border-color: rgba(40, 32, 24, 0.12);
+  :root[data-theme='dark'] .chip {
+    border-color: rgba(255, 255, 255, 0.10);
   }
 }

@@ -1,4 +1,4 @@
-export type Tab = 'today' | 'pathway' | 'browse' | 'stats' | 'settings'
+export type Tab = 'feed' | 'atlas' | 'you'
 
 interface Props {
   active: Tab
@@ -7,22 +7,16 @@ interface Props {
 
 export function BottomNav({ active, onChange }: Props) {
   return (
-    <nav className="flex-none border-t border-white/[0.06] bg-bg/95 backdrop-blur-sm">
+    <nav className="flex-none border-t border-ink/[0.08] bg-bg/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-2xl items-stretch justify-around">
-        <NavTab label="Today" active={active === 'today'} onClick={() => onChange('today')}>
-          <TodayIcon />
+        <NavTab label="Feed" active={active === 'feed'} onClick={() => onChange('feed')}>
+          <FeedIcon />
         </NavTab>
-        <NavTab label="Pathway" active={active === 'pathway'} onClick={() => onChange('pathway')}>
-          <PathwayIcon />
+        <NavTab label="Atlas" active={active === 'atlas'} onClick={() => onChange('atlas')}>
+          <AtlasIcon />
         </NavTab>
-        <NavTab label="Browse" active={active === 'browse'} onClick={() => onChange('browse')}>
-          <BrowseIcon />
-        </NavTab>
-        <NavTab label="Stats" active={active === 'stats'} onClick={() => onChange('stats')}>
-          <StatsIcon />
-        </NavTab>
-        <NavTab label="Settings" active={active === 'settings'} onClick={() => onChange('settings')}>
-          <SettingsIcon />
+        <NavTab label="You" active={active === 'you'} onClick={() => onChange('you')}>
+          <YouIcon />
         </NavTab>
       </div>
     </nav>
@@ -46,62 +40,41 @@ function NavTab({
       aria-label={label}
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
-      className={`flex flex-1 flex-col items-center gap-0.5 pb-safe pt-3 pb-3 transition-colors ${
+      className={`relative flex flex-1 flex-col items-center gap-1 pb-3 pt-3 transition-colors ${
         active ? 'text-accent' : 'text-ink-softer hover:text-ink-soft'
       }`}
     >
-      {children}
-      <span className="text-[9px] uppercase tracking-wide">{label}</span>
       {active && (
-        <span className="absolute bottom-0 h-0.5 w-8 rounded-full bg-accent opacity-0" />
+        <span className="absolute top-0 left-1/2 h-[2px] w-8 -translate-x-1/2 rounded-full bg-accent" />
       )}
+      {children}
+      <span className="text-[9px] font-medium uppercase tracking-wide">{label}</span>
     </button>
   )
 }
 
-function TodayIcon() {
+function FeedIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="17" rx="2.5" />
-      <path d="M16 2v3M8 2v3M3 9h18" />
-      <circle cx="12" cy="15" r="2" fill="currentColor" stroke="none" />
+      <path d="M4 6h16M4 11h16M4 16h10" />
     </svg>
   )
 }
 
-function PathwayIcon() {
+function AtlasIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="5" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="12" cy="19" r="2" />
-      <path d="M12 7v3M12 14v3" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
     </svg>
   )
 }
 
-function BrowseIcon() {
+function YouIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  )
-}
-
-function StatsIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 20V10M12 20V4M6 20v-6" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
   )
 }

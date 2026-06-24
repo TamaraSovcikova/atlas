@@ -30,7 +30,7 @@ export const DEFAULT_PREFS: Prefs = {
   showConstellationReveal: true,
   dailyGoalCards: 12,
   streakFreezes: 2,
-  theme: 'dark',
+  theme: 'light',
   dueBadge: true,
 }
 
