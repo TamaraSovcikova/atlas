@@ -14,6 +14,7 @@ import {
   completeSession,
 } from '../lib/dailyPlan'
 import { applyRating, type RecallRating } from '../lib/fsrs'
+import { getSyncToken, pushToCloud } from '../lib/sync'
 import { db, type Domain, type Era } from '../db/schema'
 import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
@@ -250,6 +251,11 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         })
         if (shape === 'daily') await completeDaily()
         else await completeSession(shape, sessionId(shape, eraId, domain, threadId))
+        // Auto-push to the cloud, but only if the user already has sync set up.
+        // getSyncToken (not ensureSyncToken) so we never create a token here.
+        getSyncToken().then((t) => {
+          if (t) pushToCloud()
+        })
         setDone(true)
       } else {
         if (shape === 'daily') await saveDailyProgress(nextIndex, ratingsRef.current)

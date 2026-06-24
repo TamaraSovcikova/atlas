@@ -14,11 +14,7 @@ import { INDUSTRIAL_EXPANDED } from './bank/industrial-expanded'
 import { WORLDWARS_EXPANDED } from './bank/worldwars-expanded'
 import { COLDWAR_EXPANDED } from './bank/coldwar-expanded'
 
-/**
- * Bump when the bank content changes so the loader re-syncs it into Dexie.
- * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
- */
-export const BANK_VERSION = 'v10'
+export { BANK_VERSION } from './version'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,

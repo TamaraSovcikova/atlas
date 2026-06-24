@@ -1,11 +1,10 @@
 import type { Concept, Lesson, RecallQuestion, Thread } from './schema'
 import { db } from './schema'
 import { newReview } from '../lib/fsrs'
-import { BANK_CONCEPTS, BANK_ERAS, BANK_THREADS, BANK_VERSION } from '../content'
+import { BANK_VERSION } from '../content/version'
+import type { BankConcept } from '../content/types'
 
-const FLAG_KEY = `bank:${BANK_VERSION}:loaded`
-
-function toRecallQuestions(c: (typeof BANK_CONCEPTS)[number]): RecallQuestion[] {
+function toRecallQuestions(c: BankConcept): RecallQuestion[] {
   return c.questions.map((q) => ({
     format: q.format,
     prompt: q.prompt,
@@ -25,8 +24,13 @@ function toRecallQuestions(c: (typeof BANK_CONCEPTS)[number]): RecallQuestion[] 
  * so content edits propagate. Personal edges (user notes) are never touched.
  */
 export async function loadSeedIfNeeded(): Promise<void> {
+  const FLAG_KEY = `bank:${BANK_VERSION}:loaded`
   const flag = await db.settings.get(FLAG_KEY)
   if (flag) return
+
+  // Lazy-load the (large) content bank only when a seed/re-sync is actually
+  // needed, so it stays a separate chunk and return visits skip it entirely.
+  const { BANK_CONCEPTS, BANK_ERAS, BANK_THREADS } = await import('../content')
 
   const now = Date.now()
   const bankIds = new Set(BANK_CONCEPTS.map((c) => c.id))
@@ -141,7 +145,3 @@ export async function loadSeedIfNeeded(): Promise<void> {
     },
   )
 }
-
-export const SEED_COUNT = BANK_CONCEPTS.length
-export const ERA_COUNT = BANK_ERAS.length
-export const THREAD_COUNT = BANK_THREADS.length
