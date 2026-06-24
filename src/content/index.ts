@@ -18,7 +18,7 @@ import { COLDWAR_EXPANDED } from './bank/coldwar-expanded'
  * Bump when the bank content changes so the loader re-syncs it into Dexie.
  * Progress (firstSeenAt, lastReviewedAt, review schedule) is preserved across bumps.
  */
-export const BANK_VERSION = 'v9'
+export const BANK_VERSION = 'v10'
 
 export const BANK_CONCEPTS: BankConcept[] = [
   ...ANCIENT,
