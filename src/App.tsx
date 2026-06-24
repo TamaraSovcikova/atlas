@@ -14,6 +14,7 @@ import { SessionView } from './components/SessionView'
 import { ConstellationScreen } from './components/ConstellationScreen'
 import { CollectionsView } from './components/CollectionsView'
 import { Onboarding } from './components/Onboarding'
+import { ConnectionChallenge } from './components/ConnectionChallenge'
 
 const ONBOARDED_KEY = 'onboarded:v1'
 
@@ -41,6 +42,7 @@ function App() {
   const [youPanel, setYouPanel] = useState<YouPanel>('progress')
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
+  const [challengeOpen, setChallengeOpen] = useState(false)
   const [storyBriefData, setStoryBriefData] = useState<{ concept: Concept; threadName: string } | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -207,6 +209,17 @@ function App() {
     )
   }
 
+  // Connection Challenge overlay — full screen, no bottom nav
+  if (challengeOpen) {
+    return (
+      <MotionProvider>
+        <main className="mx-auto flex min-h-full max-w-2xl flex-col">
+          <ConnectionChallenge onClose={() => setChallengeOpen(false)} />
+        </main>
+      </MotionProvider>
+    )
+  }
+
   return (
     <MotionProvider>
       <div className="flex h-full flex-col">
@@ -262,6 +275,7 @@ function App() {
                     }
                     onStartSpaced={() => startSession({ shape: 'spaced' }, 'atlas')}
                     onStartMistakes={() => startSession({ shape: 'mistakes' }, 'atlas')}
+                    onOpenChallenge={() => setChallengeOpen(true)}
                   />
                 )}
                 {atlasPanel === 'collections' && (

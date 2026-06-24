@@ -579,7 +579,26 @@ export async function buildDailySession(
   }
 
   // 2. New concepts from threads in pathway (displayOrder), tier-gated.
-  const threads = await db.threads.orderBy('displayOrder').toArray()
+  // If the user has set interest eras, gently float threads that have members
+  // in those eras to the top (stable sort preserves displayOrder within each bucket).
+  const interestEras = new Set(prefs.interestEras ?? [])
+  let threads = await db.threads.orderBy('displayOrder').toArray()
+  if (interestEras.size > 0) {
+    threads = [
+      ...threads.filter((t) =>
+        t.members.some((m) => {
+          const c = conceptById.get(m.conceptId)
+          return c?.eras?.some((e) => interestEras.has(e))
+        }),
+      ),
+      ...threads.filter((t) =>
+        !t.members.some((m) => {
+          const c = conceptById.get(m.conceptId)
+          return c?.eras?.some((e) => interestEras.has(e))
+        }),
+      ),
+    ]
+  }
   const newItems: RecallItem[] = []
   for (const thread of threads) {
     if (newItems.length >= maxNew) break

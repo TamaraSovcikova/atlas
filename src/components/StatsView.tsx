@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Review, type Era, type Session } from '../db/schema'
 import { dayStats, dayIndex, metDays, progressSnapshot } from '../lib/progress'
+import { shareCard } from '../lib/share'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { useSettings } from '../store/useSettings'
 import { summariseEras, type EraSummary } from '../lib/session'
@@ -9,6 +10,7 @@ import { summariseEras, type EraSummary } from '../lib/session'
 const WEEKS = 14
 
 export function StatsView() {
+  const [sharing, setSharing] = useState(false)
   const prefs = useSettings((s) => s.prefs)
   const sessions = useLiveQuery(() => db.sessions.toArray(), [], [] as Session[])
   const concepts = useLiveQuery(() => db.concepts.toArray(), [], [])
@@ -76,8 +78,24 @@ export function StatsView() {
 
   return (
     <section className="space-y-6">
-      <div>
+      <div className="flex items-center justify-between">
         <h2 className="font-serif text-2xl text-ink">Your progress</h2>
+        <button
+          type="button"
+          disabled={sharing}
+          onClick={async () => {
+            setSharing(true)
+            try { await shareCard() } finally { setSharing(false) }
+          }}
+          className="flex items-center gap-1.5 rounded-full border border-ink/[0.08] bg-bg-soft px-3 py-1.5 text-[11px] text-ink-softer transition-opacity hover:text-ink disabled:opacity-50"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
+          </svg>
+          {sharing ? 'Generating…' : 'Share'}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

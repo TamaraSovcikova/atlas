@@ -20,6 +20,8 @@ export interface Prefs {
   dueBadge: boolean
   /** Auto-read concept summaries aloud via Web Speech API. */
   listenMode: boolean
+  /** Era IDs the user flagged as interesting during onboarding. Biases new-concept selection. */
+  interestEras: string[]
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -35,6 +37,7 @@ export const DEFAULT_PREFS: Prefs = {
   theme: 'light',
   dueBadge: true,
   listenMode: false,
+  interestEras: [],
 }
 
 export const MAX_STREAK_FREEZES = 5

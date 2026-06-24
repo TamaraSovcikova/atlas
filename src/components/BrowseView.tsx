@@ -32,9 +32,10 @@ interface Props {
   onStartThread: (threadId: string) => void
   onStartSpaced: () => void
   onStartMistakes: () => void
+  onOpenChallenge: () => void
 }
 
-export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSpaced, onStartMistakes }: Props) {
+export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSpaced, onStartMistakes, onOpenChallenge }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [shape, setShape] = useState<Shape>('thread')
   const [query, setQuery] = useState('')
@@ -305,6 +306,17 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
               </Button>
             </div>
           )}
+
+          <div className="surface p-6">
+            <h3 className="font-serif text-lg text-ink">Graph challenge</h3>
+            <p className="mt-2 text-sm text-ink-soft">
+              Test how well you know the connections between concepts you have already met.
+              Two modes: find what IS connected, or find what is NOT.
+            </p>
+            <Button onClick={onOpenChallenge} className="mt-5">
+              Start challenge
+            </Button>
+          </div>
         </div>
       )}
 
