@@ -4,6 +4,7 @@ import { Drawer } from 'vaul'
 import { db, type Thread, type Collection } from '../db/schema'
 import { masteryOf, MASTERY_META } from '../lib/mastery'
 import { LinkedText } from './LinkedText'
+import { AskThePast } from './AskThePast'
 
 interface Props {
   rootConceptId: string | null
@@ -244,9 +245,14 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 rounded-full border border-bg-softer/40 bg-bg-soft/70 px-2.5 py-0.5 text-[11px] text-ink-softer hover:border-accent/40 hover:text-ink"
                   >
-                    source
+                    source ↗
                   </a>
                 )}
+
+                {/* Ask the past (Wave 4) */}
+                <div className="border-t border-ink/[0.06] pt-4">
+                  <AskThePast concept={concept} />
+                </div>
               </div>
             ) : (
               <p className="py-8 text-center text-sm text-ink-softer">Loading...</p>

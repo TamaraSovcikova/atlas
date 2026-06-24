@@ -3,6 +3,7 @@ import { db } from '../db/schema'
 import type { Concept } from '../db/schema'
 import type { RelationType } from '../db/schema'
 import { useSettings } from '../store/useSettings'
+import { AskThePast } from './AskThePast'
 
 function firstSentence(text: string): string {
   const idx = text.indexOf('. ')
@@ -267,6 +268,9 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
                 This is a foundation concept — one of the anchors that everything else builds on. Starting here gives you the strongest base for everything that follows.
               </p>
             )}
+            <div className="mt-4 border-t border-ink/[0.06] pt-4">
+              <AskThePast concept={concept} />
+            </div>
           </div>
         )}
       </div>

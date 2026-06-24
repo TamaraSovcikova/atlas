@@ -9,6 +9,7 @@ import { useSettings } from '../store/useSettings'
 import type { Tab } from './BottomNav'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
+import { generateDidYouKnow } from '../lib/ai'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -69,12 +70,29 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
   const [threadSummaries, setThreadSummaries] = useState<Awaited<ReturnType<typeof summariseThreads>>>([])
   const [dailyStatus, setDailyStatus] = useState<DailyStatus | null>(null)
   const [nextConcept, setNextConcept] = useState<{ concept: Concept; threadName: string } | null>(null)
+  const [dyk, setDyk] = useState<{ text: string; loaded: boolean } | null>(null)
 
   useEffect(() => {
     summariseThreads().then(setThreadSummaries)
     getDailyStatus().then(setDailyStatus)
     getNextPathwayConcept().then(setNextConcept)
   }, [conceptCount, learnedCount, dueNow])
+
+  // Generate an AI did-you-know once we know two met concepts (lazy, online-only)
+  useEffect(() => {
+    if (dyk) return // already loaded or tried
+    const metConcepts = concepts.filter((c) => c.firstSeenAt !== null)
+    if (metConcepts.length < 2) return
+    // Pick two random met concepts
+    const a = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
+    const b = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
+    if (a.id === b.id) return
+    setDyk({ text: '', loaded: false })
+    generateDidYouKnow(a.name, a.summary, b.name, b.summary).then((res) => {
+      if (res.ok) setDyk({ text: res.reply, loaded: true })
+      else setDyk(null) // quietly fail (offline or cap reached)
+    })
+  }, [concepts.length > 1]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const masteredCount = spread.counts.mastered + spread.counts.known
 
@@ -271,6 +289,23 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
           <p className="text-[11px] text-ink-softer">
             {Math.round(spread.fraction * 100)}% mastery across {spread.total} concepts
           </p>
+        </div>
+      )}
+
+      {/* AI did-you-know (Wave 4) — online-only, quiet fallback */}
+      {dyk?.loaded && dyk.text && (
+        <div className="rounded-2xl border border-accent/[0.15] bg-accent/[0.04] p-5">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-accent/70">
+            Did you know · AI
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{dyk.text}</p>
+          <button
+            type="button"
+            onClick={() => setDyk(null)}
+            className="mt-3 text-[10px] text-ink-softer hover:text-ink-soft"
+          >
+            dismiss
+          </button>
         </div>
       )}
 

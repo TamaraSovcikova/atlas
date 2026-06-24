@@ -26,6 +26,7 @@ import { ConceptRabbitHole } from './ConceptRabbitHole'
 import { Button } from './ui/Button'
 import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
+import { explainMyAnswer } from '../lib/ai'
 
 interface Props {
   shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes' | 'collection'
@@ -103,6 +104,9 @@ export function SessionView({ shape, eraId, domain, threadId, collectionId, onFi
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
   const [swipeDir, setSwipeDir] = useState<SwipeDir>(null)
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null)
+  // Explain-my-answer state (Wave 4)
+  const [explainText, setExplainText] = useState<string | null>(null)
+  const [explainLoading, setExplainLoading] = useState(false)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const allSessions = useLiveQuery(() => db.sessions.toArray(), [], [])
 
@@ -205,9 +209,11 @@ export function SessionView({ shape, eraId, domain, threadId, collectionId, onFi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape, eraId, domain, threadId, collectionId])
 
-  // Reset swipe zone state when the card changes
+  // Reset swipe zone and explain state when the card changes
   useEffect(() => {
     setRevealedRating(undefined)
+    setExplainText(null)
+    setExplainLoading(false)
   }, [index])
 
   const current: SessionItem | null = useMemo(() => {
@@ -525,6 +531,37 @@ export function SessionView({ shape, eraId, domain, threadId, collectionId, onFi
             {swipeVisible && (
               <div className="border-t border-ink/[0.07] px-6 pb-6 pt-4">
                 <SwipeRatingZone onRate={handleRate} suggestedRating={revealedRating} />
+                {/* Explain-my-answer (Wave 4): show after a wrong answer */}
+                {revealedRating === 'again' && current?.kind === 'recall' && (
+                  <div className="mt-3">
+                    {!explainText && (
+                      <button
+                        type="button"
+                        disabled={explainLoading}
+                        onClick={async () => {
+                          if (!current || current.kind !== 'recall') return
+                          setExplainLoading(true)
+                          const res = await explainMyAnswer(
+                            current.concept.name,
+                            current.question.prompt,
+                            '(unsure)',
+                            current.question.expectedAnswer,
+                          )
+                          setExplainLoading(false)
+                          setExplainText(res.ok ? res.reply : res.error)
+                        }}
+                        className="w-full rounded-xl border border-ink/[0.08] bg-bg-soft py-2 text-xs text-ink-softer transition-colors hover:border-accent/30 hover:text-ink-soft disabled:opacity-50"
+                      >
+                        {explainLoading ? 'Thinking…' : 'Explain this'}
+                      </button>
+                    )}
+                    {explainText && (
+                      <p className="rounded-xl border border-ink/[0.07] bg-bg-soft px-4 py-3 text-xs leading-relaxed text-ink-soft">
+                        {explainText}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </M.div>

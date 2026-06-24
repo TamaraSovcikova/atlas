@@ -25,6 +25,7 @@ import {
   claimAnonymousBackup,
   type AtlasUser,
 } from '../lib/auth'
+import { getByokKey, setByokKey } from '../lib/ai'
 
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 const THEMES: { key: Theme; label: string }[] = [
@@ -54,10 +55,16 @@ export function SettingsView({ canInstall, onInstall }: Props) {
   const [accountMsg, setAccountMsg] = useState<string | null>(null)
   const [accountBusy, setAccountBusy] = useState(false)
 
+  // BYOK AI key (Wave 4)
+  const [byokKey, setByokKeyState] = useState('')
+  const [revealByok, setRevealByok] = useState(false)
+  const [byokMsg, setByokMsg] = useState<string | null>(null)
+
   useEffect(() => {
     getSyncToken().then((t) => setToken(t ?? ''))
     getLastSyncedAt().then(setLastSynced)
     getCachedUser().then(setUser)
+    getByokKey().then((k) => setByokKeyState(k ?? ''))
     // Revalidate in background
     fetchUser().then((u) => { if (u) setUser(u) })
   }, [])
@@ -401,6 +408,60 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           </div>
         )}
         {accountMsg && <p className="text-xs text-accent">{accountMsg}</p>}
+      </div>
+
+      {/* AI key (Wave 4) */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">AI (optional)</h3>
+        <p className="text-xs text-ink-softer">
+          Add your own free Gemini API key for unlimited Ask-the-past, explain-my-answer, and
+          did-you-know cards. Without a key, Atlas uses a shared pool with a daily cap.{' '}
+          <span className="text-ink-soft">Get a free key at ai.google.dev/gemini-api.</span>
+        </p>
+        <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 p-3">
+          <div className="flex items-center gap-2">
+            <input
+              type={revealByok ? 'text' : 'password'}
+              value={byokKey}
+              onChange={(e) => setByokKeyState(e.target.value)}
+              placeholder="AIza… (optional)"
+              className="min-w-0 flex-1 rounded-lg border border-bg-softer/40 bg-bg px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-softer/60 focus:border-accent focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setRevealByok((r) => !r)}
+              className="shrink-0 rounded-lg border border-bg-softer/40 px-2 py-2 text-[11px] text-ink-softer hover:text-ink"
+            >
+              {revealByok ? 'hide' : 'show'}
+            </button>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                await setByokKey(byokKey || null)
+                setByokMsg(byokKey ? 'Key saved on this device.' : 'Key cleared.')
+              }}
+              className="rounded-lg border border-bg-softer/40 px-3 py-1.5 text-[11px] text-ink-soft hover:border-accent/40"
+            >
+              Save key
+            </button>
+            {byokKey && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setByokKeyState('')
+                  await setByokKey(null)
+                  setByokMsg('Key cleared.')
+                }}
+                className="rounded-lg border border-bg-softer/40 px-3 py-1.5 text-[11px] text-ink-soft hover:border-accent/40"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        {byokMsg && <p className="text-xs text-accent">{byokMsg}</p>}
       </div>
 
       <div className="space-y-3">
