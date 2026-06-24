@@ -40,7 +40,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 ## Current state
 
-2026-06-24: main=`2d52db4`. Coherence rework complete (see `~/workspace/Projects/Atlas/docs/STRATEGY.md` -- "One Spine, Two Loops"). P0 coherence: terminal DONE-FOR-TODAY daily state (getDailyStatus), unit completion decoupled from the stability wall (computeUnlockedTiers reps-gated, TIER_REPS_GATE), games exclude brand-new concepts, daily new only from the pathway. P1 guidance: first-run Onboarding.tsx explainer (onboarded:v1), explicit teach-then-try beat in Brief intro, locked/terminal/empty state copy. Track B: daily reserves new-slots so a review backlog can't starve the Spine; summariseThreads canonical home-thread dedupe; removed dead getDailyResume. P2 curriculum: threads.ts is now an AUTO-GENERATED chronological spine -- 31 threads across 6 sections homing ALL 457 concepts, tiered by edge in-degree. BANK_VERSION v10. 5-tab nav, session resume, F1 study modes, D1 sync all still live. 38 tests. NEXT: Track C habit (reminders/light theme/due badge), D insight (due calendar), F perf (bundle ~1.8MB).
+2026-06-24: main=`cf2b12d`. Wave 0 editorial/paper reskin complete. New visual identity: paper #F6F2EA / ink #221D16 / deep-blue #28486B as default theme (CSS vars in index.css :root); cool dark navy as [data-theme=dark] override. 3-tab IA: Feed / Atlas / You (was 5-tab). Atlas sub-routes Pathway|Browse; You sub-routes Progress|Settings via SegmentControl. Fraunces serif header in accent deep-blue. 38 tests. Full 2.0 plan in `~/workspace/Projects/Atlas/docs/ATLAS_2.0.md`. NEXT: Wave 1 -- feed-first home shell, Story Brief 3-beat format, free audio via Web Speech API.
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 
