@@ -5,26 +5,42 @@ interface Props {
   onCancel: () => void
 }
 
+const TAP_ICON = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M9 11V6a2 2 0 0 1 4 0v5"/><path d="M13 11V8a2 2 0 0 1 4 0v3"/><path d="M17 11a2 2 0 0 1 4 0v3a8 8 0 0 1-8 8H9a8 8 0 0 1-8-8v-1a2 2 0 0 1 4 0"/>
+  </svg>
+)
+const TYPE_ICON = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M6 16h12"/>
+  </svg>
+)
+const LISTEN_ICON = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+  </svg>
+)
+
 const MOODS = [
   {
     id: 'tap' as const,
     label: 'Tap',
     blurb: 'Tap chips, no typing. Good for the bus.',
-    icon: '👆',
+    icon: TAP_ICON,
     prefs: { minimiseTyping: true, listenMode: false },
   },
   {
     id: 'type' as const,
     label: 'Type',
     blurb: 'Type your recall. Hardest, most effective.',
-    icon: '⌨️',
+    icon: TYPE_ICON,
     prefs: { minimiseTyping: false, listenMode: false },
   },
   {
     id: 'listen' as const,
     label: 'Listen',
     blurb: 'Audio reads everything aloud. Hands-free.',
-    icon: '🎧',
+    icon: LISTEN_ICON,
     prefs: { minimiseTyping: true, listenMode: true },
   },
 ]
@@ -65,7 +81,7 @@ export function SessionMoodPicker({ onStart, onCancel }: Props) {
                     : 'border-ink/[0.08] bg-bg-soft hover:border-accent/30'
                 }`}
               >
-                <span className="text-2xl">{mood.icon}</span>
+                <span className={active ? 'text-accent' : 'text-ink-soft'}>{mood.icon}</span>
                 <span className="flex-1">
                   <span
                     className={`block text-sm font-semibold ${active ? 'text-accent' : 'text-ink'}`}

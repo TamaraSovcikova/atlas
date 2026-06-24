@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Review, type Era, type Session } from '../db/schema'
 import { dayStats, dayIndex, metDays, progressSnapshot } from '../lib/progress'
@@ -99,10 +99,10 @@ export function StatsView() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <BigStat glyph="🔥" value={snapshot.streak} label="day streak" />
-        <BigStat glyph="🏅" value={snapshot.bestStreak} label="best streak" />
-        <BigStat glyph="🗂️" value={snapshot.totalCards} label="cards seen" />
-        <BigStat glyph="⏱️" value={totalMinutes} label="minutes" />
+        <BigStat icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/></svg>} value={snapshot.streak} label="day streak" />
+        <BigStat icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>} value={snapshot.bestStreak} label="best streak" />
+        <BigStat icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>} value={snapshot.totalCards} label="cards seen" />
+        <BigStat icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>} value={totalMinutes} label="minutes" />
       </div>
 
       {/* Streak heatmap */}
@@ -269,10 +269,10 @@ export function StatsView() {
   )
 }
 
-function BigStat({ glyph, value, label }: { glyph: string; value: number; label: string }) {
+function BigStat({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
     <div className="flex flex-col items-center gap-1 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-4">
-      <span className="text-xl leading-none">{glyph}</span>
+      <span className="text-ink-soft">{icon}</span>
       <span className="text-2xl font-semibold tabular-nums text-ink">{value}</span>
       <span className="text-[10px] uppercase tracking-wide text-ink-softer">{label}</span>
     </div>

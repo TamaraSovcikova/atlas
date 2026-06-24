@@ -203,12 +203,12 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
           </div>
         )}
 
-        {/* Beat 2: The Story */}
+        {/* Beat 2: Why it matters */}
         {beat === 1 && (
           <div className="space-y-5 py-6">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-widest text-ink-softer">
-                {threadName}
+                Why it matters · {threadName}
               </p>
               <h2 className="mt-2 font-serif text-2xl font-semibold text-ink">{concept.name}</h2>
             </div>

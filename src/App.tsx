@@ -36,13 +36,13 @@ export type SessionConfig =
   | { shape: 'mistakes' }
   | { shape: 'collection'; collectionId: string }
 
-type AtlasPanel = 'pathway' | 'browse' | 'collections'
+type AtlasPanel = 'map' | 'pathway' | 'browse' | 'collections'
 type YouPanel = 'progress' | 'settings'
 
 function App() {
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState<Tab>('feed')
-  const [atlasPanel, setAtlasPanel] = useState<AtlasPanel>('pathway')
+  const [atlasPanel, setAtlasPanel] = useState<AtlasPanel>('map')
   const [youPanel, setYouPanel] = useState<YouPanel>('progress')
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
@@ -276,6 +276,7 @@ function App() {
               <div className="space-y-5">
                 <SegmentControl
                   options={[
+                    { key: 'map' as AtlasPanel, label: 'Map' },
                     { key: 'pathway' as AtlasPanel, label: 'Pathway' },
                     { key: 'browse' as AtlasPanel, label: 'Browse' },
                     { key: 'collections' as AtlasPanel, label: 'Collections' },
@@ -283,6 +284,9 @@ function App() {
                   active={atlasPanel}
                   onChange={setAtlasPanel}
                 />
+                {atlasPanel === 'map' && (
+                  <ConstellationScreen onClose={() => setAtlasPanel('pathway')} />
+                )}
                 {atlasPanel === 'pathway' && (
                   <PathwayView
                     onStartThread={(threadId) =>

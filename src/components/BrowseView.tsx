@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Concept, type Domain, type Era } from '../db/schema'
+import { db, type Domain, type Era } from '../db/schema'
 import {
   summariseDomains,
   summariseEras,
@@ -38,12 +38,16 @@ interface Props {
 export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSpaced, onStartMistakes, onOpenChallenge }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [shape, setShape] = useState<Shape>('thread')
-  const [query, setQuery] = useState('')
-  const [conceptResults, setConceptResults] = useState<Concept[]>([])
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
 
   const eras = useLiveQuery(() => db.eras.orderBy('displayOrder').toArray(), [], [] as Era[])
-  const dueNow = useLiveQuery(() => db.reviews.where('dueAt').belowOrEqual(Date.now()).count(), [], 0)
+  const dueNow = useLiveQuery(async () => {
+    const metIds = new Set(
+      (await db.concepts.filter((c) => c.firstSeenAt !== null).toArray()).map((c) => c.id),
+    )
+    const allDue = await db.reviews.where('dueAt').belowOrEqual(Date.now()).toArray()
+    return allDue.filter((r) => metIds.has(r.conceptId)).length
+  }, [], 0)
   const leechCount = useLiveQuery(
     () => db.reviews.filter((r) => r.failureStreak >= 1).count(),
     [],
@@ -77,38 +81,7 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
     })
   }, [conceptCount, learnedCount, dueNow, prefs])
 
-  const q = query.trim().toLowerCase()
-
-  // Concept search — fires when query is at least 2 chars
-  useEffect(() => {
-    if (q.length < 2) {
-      setConceptResults([])
-      return
-    }
-    db.concepts
-      .filter((c) => c.name.toLowerCase().includes(q) || c.summary?.toLowerCase().includes(q))
-      .limit(12)
-      .toArray()
-      .then(setConceptResults)
-  }, [q])
-
-  const filteredThreads = useMemo(
-    () => (q ? threadSummaries.filter((t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) : threadSummaries),
-    [threadSummaries, q],
-  )
-
-  const filteredEras = useMemo(
-    () => (q ? (eras ?? []).filter((e) => e.name.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q)) : (eras ?? [])),
-    [eras, q],
-  )
-
-  const filteredDomains = useMemo(
-    () =>
-      (Object.keys(DOMAIN_LABEL) as Domain[]).filter(
-        (d) => !q || DOMAIN_LABEL[d].toLowerCase().includes(q),
-      ),
-    [q],
-  )
+  const allDomains = Object.keys(DOMAIN_LABEL) as Domain[]
 
   return (
     <section className="space-y-5">
@@ -116,49 +89,6 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
         <h2 className="font-serif text-2xl text-ink">Browse</h2>
         <p className="mt-1 text-sm text-ink-softer">Explore by story, era, or subject. Start a focused session on any slice.</p>
       </div>
-
-      {/* Search */}
-      <div className="relative">
-        <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-softer"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search stories, eras, concepts…"
-          className="w-full rounded-2xl border border-ink/[0.08] bg-bg-soft py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-softer focus:border-accent/40 focus:outline-none"
-        />
-      </div>
-
-      {/* Concept results — shown when query is long enough */}
-      {q.length >= 2 && conceptResults.length > 0 && (
-        <div>
-          <p className="mb-2 text-[11px] uppercase tracking-wider text-ink-softer">Concepts</p>
-          <ul className="flex flex-wrap gap-2">
-            {conceptResults.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setRabbitHoleId(c.id)}
-                  className="rounded-full border border-ink/[0.07] bg-bg-soft/60 px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-accent/40 hover:text-ink active:scale-[0.97]"
-                >
-                  {c.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {/* Shape tabs */}
       <nav className="grid grid-cols-4 gap-1.5">
@@ -171,12 +101,10 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
       {/* Lists */}
       {shape === 'thread' && (
         <ul className="space-y-2">
-          {filteredThreads.length === 0 && (
-            <li className="surface p-5 text-sm text-ink-soft">
-              {q ? 'No stories match.' : 'No stories yet.'}
-            </li>
+          {threadSummaries.length === 0 && (
+            <li className="surface p-5 text-sm text-ink-soft">No stories yet.</li>
           )}
-          {filteredThreads.map((t) => {
+          {threadSummaries.map((t) => {
             const empty = t.total === 0
             const resume = threadResume.get(t.threadId)
             return (
@@ -212,12 +140,10 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
 
       {shape === 'era' && (
         <ul className="space-y-2">
-          {filteredEras.length === 0 && (
-            <li className="surface p-5 text-sm text-ink-soft">
-              {q ? 'No eras match.' : 'No eras yet.'}
-            </li>
+          {(eras ?? []).length === 0 && (
+            <li className="surface p-5 text-sm text-ink-soft">No eras yet.</li>
           )}
-          {filteredEras.map((era) => {
+          {(eras ?? []).map((era) => {
             const summary = eraSummaries.get(era.id) ?? { eraId: era.id, due: 0, newAvailable: 0, met: 0, total: 0 }
             const empty = summary.total === 0
             return (
@@ -248,10 +174,7 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
 
       {shape === 'domain' && (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {filteredDomains.length === 0 && (
-            <li className="surface p-4 text-sm text-ink-soft">No domains match.</li>
-          )}
-          {filteredDomains.map((domain) => {
+          {allDomains.map((domain) => {
             const summary = domainSummaries.get(domain) ?? { domain, due: 0, newAvailable: 0, met: 0, total: 0 }
             const empty = summary.total === 0
             return (

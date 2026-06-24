@@ -47,9 +47,10 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           href={concept.wikipediaUrl}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 rounded-full border border-bg-softer/40 bg-bg-soft/70 px-2.5 py-0.5 text-[11px] text-ink-softer transition-colors hover:border-accent/40 hover:text-ink"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-ink/[0.10] bg-bg-soft px-3 py-1 text-[11px] text-ink-softer transition-colors hover:border-accent/40 hover:text-ink"
         >
-          source
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.09 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10zm-1.5 14.5v-9l6.5 4.5-6.5 4.5z"/></svg>
+          Read on Wikipedia
         </a>
       )}
       {variant === 'intro' && (

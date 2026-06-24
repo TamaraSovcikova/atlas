@@ -3,7 +3,6 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Concept, type Collection, type RelationType } from '../db/schema'
 import { summariseThreads, getNextPathwayConcept } from '../lib/session'
 import { getDailyStatus, type DailyStatus } from '../lib/dailyPlan'
-import { useSettings } from '../store/useSettings'
 import type { Tab } from './BottomNav'
 import { Button } from './ui/Button'
 import { generateDidYouKnow } from '../lib/ai'
@@ -50,15 +49,21 @@ export function HomeView({
   onNavigate,
   onOpenStoryBrief,
 }: Props) {
-  const prefs = useSettings((s) => s.prefs)
-  const updatePrefs = useSettings((s) => s.update)
 
-  const dueNow = useLiveQuery(() => db.reviews.where('dueAt').belowOrEqual(Date.now()).count(), [], 0)
-  const dueTomorrow = useLiveQuery(
-    () => db.reviews.where('dueAt').between(Date.now(), Date.now() + 86400000).count(),
-    [],
-    0,
-  )
+  const dueNow = useLiveQuery(async () => {
+    const metIds = new Set(
+      (await db.concepts.filter((c) => c.firstSeenAt !== null).toArray()).map((c) => c.id),
+    )
+    const allDue = await db.reviews.where('dueAt').belowOrEqual(Date.now()).toArray()
+    return allDue.filter((r) => metIds.has(r.conceptId)).length
+  }, [], 0)
+  const dueTomorrow = useLiveQuery(async () => {
+    const metIds = new Set(
+      (await db.concepts.filter((c) => c.firstSeenAt !== null).toArray()).map((c) => c.id),
+    )
+    const window = await db.reviews.where('dueAt').between(Date.now(), Date.now() + 86400000).toArray()
+    return window.filter((r) => metIds.has(r.conceptId)).length
+  }, [], 0)
   const learnedCount = useLiveQuery(
     () => db.concepts.filter((c) => c.firstSeenAt !== null).count(),
     [],
@@ -76,6 +81,9 @@ export function HomeView({
   const [dueConcepts, setDueConcepts] = useState<Concept[]>([])
   const [connectionCard, setConnectionCard] = useState<{
     from: Concept; to: Concept; relation: RelationType; yearDiff: number | null
+  } | null>(null)
+  const [teaserCard, setTeaserCard] = useState<{
+    from: Concept; to: Concept; relation: RelationType
   } | null>(null)
   const [dyk, setDyk] = useState<{ text: string } | null>(null)
 
@@ -120,6 +128,19 @@ export function HomeView({
     }
     load()
   }, [learnedCount])
+
+  // Teaser connection card — shown when the user has <2 met concepts; picks from full graph
+  useEffect(() => {
+    if (connectionCard !== null) return
+    async function load() {
+      const edges = await db.edges.limit(80).toArray()
+      if (!edges.length) return
+      const edge = edges[Math.floor(Math.random() * edges.length)]!
+      const [from, to] = await Promise.all([db.concepts.get(edge.fromId), db.concepts.get(edge.toId)])
+      if (from && to) setTeaserCard({ from, to, relation: edge.relation })
+    }
+    load()
+  }, [connectionCard])
 
   // AI DYK — online-only, quiet fallback
   useEffect(() => {
@@ -188,31 +209,18 @@ export function HomeView({
                 ? `Continue — ${dailyStatus.resume.remaining} left`
                 : 'Begin today'}
             </Button>
-
-            {/* Listen mode toggle */}
-            <div className="mt-3 flex items-center justify-between border-t border-ink/[0.06] pt-3">
-              <span className="flex items-center gap-1.5 text-[11px] text-ink-softer">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                </svg>
-                Listen mode
-              </span>
-              <button
-                type="button"
-                onClick={() => updatePrefs({ listenMode: !prefs.listenMode })}
-                className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
-                  prefs.listenMode
-                    ? 'border-accent/50 bg-accent/10 text-accent'
-                    : 'border-ink/[0.10] text-ink-softer hover:border-accent/30'
-                }`}
-              >
-                {prefs.listenMode ? 'On' : 'Off'}
-              </button>
-            </div>
           </>
         )}
       </div>
+
+      {/* ── Caught-up divider ── */}
+      {isDone && (
+        <div className="flex items-center gap-3 py-1">
+          <div className="h-px flex-1 bg-ink/[0.07]" />
+          <span className="text-[10px] uppercase tracking-widest text-ink-softer">keep reading</span>
+          <div className="h-px flex-1 bg-ink/[0.07]" />
+        </div>
+      )}
 
       {/* ── Inline review teasers ── */}
       {dueConcepts.length > 0 && !isDone && (
@@ -263,8 +271,8 @@ export function HomeView({
         </button>
       )}
 
-      {/* ── Connection card ── */}
-      {connectionCard && (
+      {/* ── Connection card (real if met≥2, teaser otherwise) ── */}
+      {connectionCard ? (
         <div className="rounded-2xl border border-ink/[0.07] bg-bg-soft/60 p-5">
           <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">
             In your constellation
@@ -286,6 +294,22 @@ export function HomeView({
           >
             Explore your graph →
           </button>
+        </div>
+      ) : teaserCard && (
+        <div className="rounded-2xl border border-ink/[0.07] bg-bg-soft/60 p-5">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">
+            Ahead in your constellation
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-ink">
+            <span className="font-semibold text-ink">{teaserCard.from.name}</span>
+            {' '}
+            <span className="text-ink-soft">{RELATION_PHRASE[teaserCard.relation]}</span>
+            {' '}
+            <span className="font-semibold text-ink">{teaserCard.to.name}</span>
+          </p>
+          <p className="mt-2 text-[11px] text-ink-softer">
+            Keep learning to unlock these connections in your map.
+          </p>
         </div>
       )}
 
