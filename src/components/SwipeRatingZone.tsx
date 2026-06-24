@@ -54,7 +54,7 @@ export function SwipeRatingZone({ onRate, suggestedRating }: Props) {
       }}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
-      className="relative overflow-hidden rounded-2xl border border-white/[0.08] cursor-grab select-none active:cursor-grabbing"
+      className="relative overflow-hidden rounded-2xl border border-ink/[0.08] cursor-grab select-none active:cursor-grabbing"
     >
       {/* colored fills */}
       <M.div style={{ opacity: leftFill }} className="pointer-events-none absolute inset-0 bg-red-500/22" />
@@ -74,9 +74,9 @@ export function SwipeRatingZone({ onRate, suggestedRating }: Props) {
           {hint}
         </M.span>
 
-        <M.div style={{ scale: goodScale }} className="flex items-center gap-2.5 text-amber-400">
+        <M.div style={{ scale: goodScale }} className="flex items-center gap-2.5 text-accent">
           <span className="text-sm font-medium">Got it</span>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-400/35 bg-amber-400/12">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/35 bg-accent/10">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M20 6 9 17l-5-5" />
             </svg>

@@ -143,7 +143,7 @@ export function PathwayView({ onStartThread }: Props) {
                     bottom: 12,
                     background: unit.completeFraction === 1
                       ? 'linear-gradient(rgba(74,222,128,0.4), rgba(74,222,128,0.1))'
-                      : 'rgba(255,255,255,0.07)',
+                      : 'rgb(var(--ink) / 0.08)',
                   }}
                 />
 
@@ -158,8 +158,8 @@ export function PathwayView({ onStartThread }: Props) {
                   const c = 2 * Math.PI * r
                   const ringColor =
                     state === 'complete' ? '#4ade80' :
-                    state === 'current' ? '#fbbf24' :
-                    'rgba(255,255,255,0.15)'
+                    state === 'current' ? '#28486B' :
+                    'rgb(var(--ink) / 0.12)'
 
                   return (
                     <li key={t.threadId} className="relative flex gap-3">
@@ -171,7 +171,7 @@ export function PathwayView({ onStartThread }: Props) {
                         className="absolute -left-6 top-4 z-10"
                       >
                         <svg width="20" height="20" viewBox="0 0 20 20">
-                          <circle cx="10" cy="10" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="2" />
+                          <circle cx="10" cy="10" r={r} fill="none" style={{ stroke: 'rgb(var(--ink) / 0.1)' }} strokeWidth="2" />
                           <circle
                             cx="10" cy="10" r={r}
                             fill="none" stroke={ringColor} strokeWidth="2"
@@ -195,10 +195,10 @@ export function PathwayView({ onStartThread }: Props) {
                           state === 'current'
                             ? 'border-accent/50 bg-accent/[0.06] shadow-glow'
                             : state === 'locked'
-                              ? 'border-white/[0.04] bg-bg-soft/20 opacity-50'
+                              ? 'border-ink/[0.05] bg-bg-soft/20 opacity-50'
                               : state === 'complete'
                                 ? 'border-good/20 bg-good/[0.04] hover:border-good/40'
-                                : 'border-white/[0.07] bg-bg-soft/50 hover:border-accent/40'
+                                : 'border-ink/[0.08] bg-bg-soft/70 hover:border-accent/40'
                         }`}
                       >
                         <div className="flex items-baseline justify-between gap-2">

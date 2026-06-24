@@ -66,8 +66,8 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
     <Drawer.Root open={rootConceptId !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/60" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[80vh] max-w-2xl flex-col rounded-t-3xl border-t border-white/10 bg-bg-soft shadow-raised outline-none">
-          <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-white/15" />
+        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[80vh] max-w-2xl flex-col rounded-t-3xl border-t border-ink/[0.10] bg-bg-soft shadow-raised outline-none">
+          <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-ink/[0.12]" />
 
           <div className="flex shrink-0 items-center justify-between px-6 py-3">
             {canGoBack ? (
@@ -136,7 +136,7 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
                     {threads.map((t) => (
                       <span
                         key={t.id}
-                        className="rounded-full border border-white/[0.07] bg-bg-softer/40 px-2.5 py-0.5 text-[11px] text-ink-softer"
+                        className="rounded-full border border-ink/[0.07] bg-bg-softer/40 px-2.5 py-0.5 text-[11px] text-ink-softer"
                       >
                         {t.name}
                       </span>

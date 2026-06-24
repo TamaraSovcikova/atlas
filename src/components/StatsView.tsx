@@ -213,7 +213,7 @@ export function StatsView() {
 
 function BigStat({ glyph, value, label }: { glyph: string; value: number; label: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-bg-soft/50 px-2 py-4">
+    <div className="flex flex-col items-center gap-1 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-4">
       <span className="text-xl leading-none">{glyph}</span>
       <span className="text-2xl font-semibold tabular-nums text-ink">{value}</span>
       <span className="text-[10px] uppercase tracking-wide text-ink-softer">{label}</span>

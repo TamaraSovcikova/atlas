@@ -68,7 +68,7 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
               className={`rounded-full border px-4 py-2 text-sm transition-all active:scale-95 ${
                 selected === e.concept.id
                   ? 'border-accent bg-accent/15 text-ink shadow-glow'
-                  : 'border-white/10 bg-bg-raised text-ink hover:border-accent/50'
+                  : 'border-ink/[0.10] bg-bg-raised text-ink hover:border-accent/50'
               }`}
             >
               {e.concept.name}
@@ -89,7 +89,7 @@ export function SortCard({ item, onAnswered, onDone }: Props) {
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 selected && !revealed
                   ? 'border-accent/50 bg-accent/5 hover:border-accent'
-                  : 'border-white/10 bg-bg-soft/60'
+                  : 'border-ink/[0.10] bg-bg-soft/60'
               } disabled:cursor-default`}
             >
               <p className="text-sm font-medium text-ink">{bucket.label}</p>

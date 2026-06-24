@@ -409,7 +409,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
     <>
       <div className="space-y-4">
         {/* Constellation strip */}
-        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-bg-soft shadow-card">
+        <div className="overflow-hidden rounded-2xl border border-ink/[0.08] bg-bg-soft shadow-card">
           <ConstellationPreview focusConceptId={activeConcept} pulseKey={pulseKey} height={160} />
         </div>
 
@@ -434,7 +434,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
               <button
                 type="button"
                 onClick={handleUndo}
-                className="flex items-center gap-1 rounded-full border border-white/10 bg-bg-soft px-2.5 py-1 text-ink-soft hover:border-accent/40 hover:text-ink"
+                className="flex items-center gap-1 rounded-full border border-ink/[0.10] bg-bg-soft px-2.5 py-1 text-ink-soft hover:border-accent/40 hover:text-ink"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M9 14 4 9l5-5" />
@@ -452,26 +452,23 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         {/* Segmented progress dots */}
         <div className="flex gap-1">
           {plan.items.map((_, i) => (
-            <M.div
+            <div
               key={i}
-              className="h-1.5 flex-1 rounded-full"
-              animate={{
-                backgroundColor:
-                  i < index
-                    ? '#fbbf24'
-                    : i === index
-                      ? 'rgba(251,191,36,0.45)'
-                      : 'rgba(44,37,27,1)',
-              }}
-              transition={{ duration: 0.3 }}
+              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                i < index
+                  ? 'bg-accent'
+                  : i === index
+                    ? 'bg-accent/40'
+                    : 'bg-bg-softer'
+              }`}
             />
           ))}
         </div>
 
         {/* Ghost card stack for depth */}
         <div className="relative">
-          <div className="absolute inset-x-4 -top-2.5 bottom-0 rounded-2xl border border-white/[0.03] bg-bg-softer/40" />
-          <div className="absolute inset-x-2 -top-1.5 bottom-0 rounded-2xl border border-white/[0.05] bg-bg-softer/60" />
+          <div className="absolute inset-x-4 -top-2.5 bottom-0 rounded-2xl border border-ink/[0.05] bg-bg-softer/40" />
+          <div className="absolute inset-x-2 -top-1.5 bottom-0 rounded-2xl border border-ink/[0.07] bg-bg-softer/60" />
 
         <AnimatePresence mode="wait" custom={swipeDir}>
           <M.div
@@ -486,7 +483,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
           >
             {/* Leech indicator */}
             {isRecallCard && current.review.failureStreak >= 3 && (
-              <div className="flex items-center gap-1.5 border-b border-white/[0.05] px-6 py-2">
+              <div className="flex items-center gap-1.5 border-b border-ink/[0.07] px-6 py-2">
                 <span className="text-[10px]">⚠</span>
                 <span className="text-[10px] uppercase tracking-wider text-ink-softer">This one keeps slipping</span>
               </div>
@@ -511,7 +508,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
 
             {/* Swipe zone appears after reveal, outside the scroll area */}
             {swipeVisible && (
-              <div className="border-t border-white/[0.06] px-6 pb-6 pt-4">
+              <div className="border-t border-ink/[0.07] px-6 pb-6 pt-4">
                 <SwipeRatingZone onRate={handleRate} suggestedRating={revealedRating} />
               </div>
             )}

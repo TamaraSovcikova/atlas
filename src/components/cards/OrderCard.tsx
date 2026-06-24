@@ -180,7 +180,7 @@ function SortableRow({ id, index, name }: { id: string; index: number; name: str
       className={`flex cursor-grab touch-none items-center gap-3 rounded-xl border px-4 py-3 active:cursor-grabbing ${
         isDragging
           ? 'border-accent/60 bg-bg-raised shadow-glow'
-          : 'border-white/10 bg-bg-soft'
+          : 'border-ink/[0.10] bg-bg-soft'
       }`}
     >
       <span className="text-ink-softer">

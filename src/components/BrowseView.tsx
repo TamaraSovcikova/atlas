@@ -135,7 +135,7 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search stories, eras, concepts…"
-          className="w-full rounded-2xl border border-white/[0.08] bg-bg-soft py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-softer focus:border-accent/40 focus:outline-none"
+          className="w-full rounded-2xl border border-ink/[0.08] bg-bg-soft py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-softer focus:border-accent/40 focus:outline-none"
         />
       </div>
 
@@ -149,7 +149,7 @@ export function BrowseView({ onStartEra, onStartDomain, onStartThread, onStartSp
                 <button
                   type="button"
                   onClick={() => setRabbitHoleId(c.id)}
-                  className="rounded-full border border-white/[0.07] bg-bg-soft/60 px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-accent/40 hover:text-ink active:scale-[0.97]"
+                  className="rounded-full border border-ink/[0.07] bg-bg-soft/60 px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-accent/40 hover:text-ink active:scale-[0.97]"
                 >
                   {c.name}
                 </button>
@@ -321,7 +321,7 @@ function ShapeTab({ label, active, onClick }: { label: string; active: boolean; 
       className={`rounded-xl border py-2 text-center text-sm transition-all active:scale-[0.98] ${
         active
           ? 'border-accent/50 bg-accent/10 font-medium text-accent shadow-glow'
-          : 'border-white/[0.07] bg-bg-soft/40 text-ink-soft hover:border-accent/30'
+          : 'border-ink/[0.07] bg-bg-soft/40 text-ink-soft hover:border-accent/30'
       }`}
     >
       {label}
