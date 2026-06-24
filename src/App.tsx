@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Domain, type Concept } from './db/schema'
+import { progressSnapshot } from './lib/progress'
 import { loadSeedIfNeeded } from './db/seed'
 import { useSettings } from './store/useSettings'
 import { MotionProvider } from './components/ui/motion'
@@ -15,6 +17,8 @@ import { ConstellationScreen } from './components/ConstellationScreen'
 import { CollectionsView } from './components/CollectionsView'
 import { Onboarding } from './components/Onboarding'
 import { ConnectionChallenge } from './components/ConnectionChallenge'
+import { SearchModal } from './components/SearchModal'
+import { SessionMoodPicker } from './components/SessionMoodPicker'
 
 const ONBOARDED_KEY = 'onboarded:v1'
 
@@ -43,11 +47,14 @@ function App() {
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
   const [challengeOpen, setChallengeOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false)
   const [storyBriefData, setStoryBriefData] = useState<{ concept: Concept; threadName: string } | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const loadSettings = useSettings((s) => s.load)
   const prefs = useSettings((s) => s.prefs)
+  const streak = useStreak()
 
   useEffect(() => {
     let cancelled = false
@@ -223,13 +230,32 @@ function App() {
   return (
     <MotionProvider>
       <div className="flex h-full flex-col">
-        {/* Editorial header */}
+        {/* Editorial header — wordmark · quiet streak · search */}
         <header className="flex-none border-b border-ink/[0.08] bg-bg px-5 py-3">
-          <div className="mx-auto flex max-w-2xl items-center">
-            <button type="button" onClick={() => setTab('feed')} className="text-left">
-              <h1 className="font-serif text-2xl font-semibold tracking-tight text-accent">
-                Atlas
-              </h1>
+          <div className="mx-auto flex max-w-2xl items-center gap-3">
+            <button type="button" onClick={() => setTab('feed')} className="mr-auto text-left">
+              <h1 className="font-serif text-2xl font-semibold tracking-tight text-accent">Atlas</h1>
+            </button>
+            {streak > 0 && (
+              <button
+                type="button"
+                onClick={() => { setTab('you'); setYouPanel('progress') }}
+                className="flex items-center gap-1 text-sm text-ink-softer hover:text-ink"
+              >
+                <span>🔥</span>
+                <span className="tabular-nums">{streak}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              className="rounded-full p-1.5 text-ink-softer hover:text-ink"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
             </button>
           </div>
         </header>
@@ -239,7 +265,7 @@ function App() {
           <div className="mx-auto max-w-2xl px-5 py-6">
             {tab === 'feed' && (
               <HomeView
-                onStartDaily={() => startSession({ shape: 'daily' }, 'feed')}
+                onStartDaily={() => setMoodPickerOpen(true)}
                 onStartPractice={() => startSession({ shape: 'spaced' }, 'feed')}
                 onOpenConstellation={() => setConstellationOpen(true)}
                 onNavigate={setTab}
@@ -308,6 +334,22 @@ function App() {
 
         <BottomNav active={tab} onChange={setTab} />
       </div>
+
+      {/* Search modal — layered on top of everything */}
+      {searchOpen && (
+        <SearchModal
+          onClose={() => setSearchOpen(false)}
+          onNavigateAtlas={() => { setTab('atlas'); setAtlasPanel('browse') }}
+        />
+      )}
+
+      {/* Mood picker — shown before starting a daily session */}
+      {moodPickerOpen && (
+        <SessionMoodPicker
+          onStart={() => { setMoodPickerOpen(false); startSession({ shape: 'daily' }, 'feed') }}
+          onCancel={() => setMoodPickerOpen(false)}
+        />
+      )}
     </MotionProvider>
   )
 }
@@ -338,6 +380,15 @@ function SegmentControl<T extends string>({
         </button>
       ))}
     </div>
+  )
+}
+
+function useStreak(): number {
+  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
+  const prefs = useSettings((s) => s.prefs)
+  return useMemo(
+    () => progressSnapshot(sessions, prefs.dailyGoalCards, prefs.streakFreezes).streak,
+    [sessions, prefs.dailyGoalCards, prefs.streakFreezes],
   )
 }
 

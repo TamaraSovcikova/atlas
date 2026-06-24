@@ -1,17 +1,34 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Review, type Concept } from '../db/schema'
+import { db, type Concept, type Collection, type RelationType } from '../db/schema'
 import { summariseThreads, getNextPathwayConcept } from '../lib/session'
-import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
-import { progressSnapshot } from '../lib/progress'
 import { getDailyStatus, type DailyStatus } from '../lib/dailyPlan'
 import { useSettings } from '../store/useSettings'
 import type { Tab } from './BottomNav'
 import { Button } from './ui/Button'
-import { ConstellationPreview } from './ConstellationPreview'
 import { generateDidYouKnow } from '../lib/ai'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
+const RELATION_PHRASE: Record<RelationType, string> = {
+  caused: 'directly caused',
+  influenced_by: 'heavily influenced',
+  contemporary_of: 'was a contemporary of',
+  located_in: 'was located in',
+  part_of: 'was part of',
+  opposed: 'actively opposed',
+  successor_of: 'succeeded',
+  belief_in: 'was rooted in belief in',
+  student_of: 'was a student of',
+}
+
+const DOMAIN_DOT: Record<string, string> = {
+  history: 'bg-[#9C5B43]',
+  geography: 'bg-[#5E7A63]',
+  science: 'bg-[#4A6175]',
+  culture: 'bg-[#6E4A6B]',
+  religions: 'bg-[#9A7B3F]',
+  politics: 'bg-[#8A4A4A]',
+  modern_world: 'bg-[#3F6E6A]',
+}
 
 function firstSentence(text: string): string {
   const idx = text.indexOf('. ')
@@ -26,123 +43,109 @@ interface Props {
   onOpenStoryBrief: (concept: Concept, threadName: string) => void
 }
 
-export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, onNavigate, onOpenStoryBrief }: Props) {
+export function HomeView({
+  onStartDaily,
+  onStartPractice,
+  onOpenConstellation,
+  onNavigate,
+  onOpenStoryBrief,
+}: Props) {
   const prefs = useSettings((s) => s.prefs)
   const updatePrefs = useSettings((s) => s.update)
 
-  const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
+  const dueNow = useLiveQuery(() => db.reviews.where('dueAt').belowOrEqual(Date.now()).count(), [], 0)
+  const dueTomorrow = useLiveQuery(
+    () => db.reviews.where('dueAt').between(Date.now(), Date.now() + 86400000).count(),
+    [],
+    0,
+  )
   const learnedCount = useLiveQuery(
     () => db.concepts.filter((c) => c.firstSeenAt !== null).count(),
     [],
     0,
   )
-  const dueNow = useLiveQuery(() => db.reviews.where('dueAt').belowOrEqual(Date.now()).count(), [], 0)
-  const dueTomorrow = useLiveQuery(
-    () =>
-      db.reviews
-        .where('dueAt')
-        .between(Date.now(), Date.now() + MS_PER_DAY)
-        .count(),
+  const collections = useLiveQuery(
+    () => db.collections.orderBy('createdAt').toArray(),
     [],
-    0,
+    [] as Collection[],
   )
 
-  const concepts = useLiveQuery(() => db.concepts.toArray(), [], [])
-  const reviews = useLiveQuery(() => db.reviews.toArray(), [], [] as Review[])
-  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
-
-  const reviewByConcept = useMemo(() => {
-    const m = new Map<string, Review>()
-    for (const r of reviews) m.set(r.conceptId, r)
-    return m
-  }, [reviews])
-
-  const spread = useMemo(() => {
-    const levels = concepts.map((c) => masteryOf(reviewByConcept.get(c.id), c.firstSeenAt !== null))
-    return masterySpread(levels)
-  }, [concepts, reviewByConcept])
-
-  const snapshot = useMemo(
-    () => progressSnapshot(sessions, prefs.dailyGoalCards, prefs.streakFreezes),
-    [sessions, prefs.dailyGoalCards, prefs.streakFreezes],
-  )
-
-  const [threadSummaries, setThreadSummaries] = useState<Awaited<ReturnType<typeof summariseThreads>>>([])
   const [dailyStatus, setDailyStatus] = useState<DailyStatus | null>(null)
   const [nextConcept, setNextConcept] = useState<{ concept: Concept; threadName: string } | null>(null)
-  const [dyk, setDyk] = useState<{ text: string; loaded: boolean } | null>(null)
+  const [threadSummaries, setThreadSummaries] = useState<Awaited<ReturnType<typeof summariseThreads>>>([])
+  const [dueConcepts, setDueConcepts] = useState<Concept[]>([])
+  const [connectionCard, setConnectionCard] = useState<{
+    from: Concept; to: Concept; relation: RelationType; yearDiff: number | null
+  } | null>(null)
+  const [dyk, setDyk] = useState<{ text: string } | null>(null)
 
   useEffect(() => {
-    summariseThreads().then(setThreadSummaries)
     getDailyStatus().then(setDailyStatus)
     getNextPathwayConcept().then(setNextConcept)
-  }, [conceptCount, learnedCount, dueNow])
+    summariseThreads().then(setThreadSummaries)
+  }, [learnedCount, dueNow])
 
-  // Generate an AI did-you-know once we know two met concepts (lazy, online-only)
+  // Inline review teasers — up to 3 due met concepts
   useEffect(() => {
-    if (dyk) return // already loaded or tried
-    const metConcepts = concepts.filter((c) => c.firstSeenAt !== null)
-    if (metConcepts.length < 2) return
-    // Pick two random met concepts
-    const a = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
-    const b = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
-    if (a.id === b.id) return
-    setDyk({ text: '', loaded: false })
-    generateDidYouKnow(a.name, a.summary, b.name, b.summary).then((res) => {
-      if (res.ok) setDyk({ text: res.reply, loaded: true })
-      else setDyk(null) // quietly fail (offline or cap reached)
-    })
-  }, [concepts.length > 1]) // eslint-disable-line react-hooks/exhaustive-deps
+    async function load() {
+      const dueReviews = await db.reviews.where('dueAt').belowOrEqual(Date.now()).toArray()
+      const results: Concept[] = []
+      for (const r of dueReviews.slice(0, 8)) {
+        if (results.length >= 3) break
+        const c = await db.concepts.get(r.conceptId)
+        if (c?.firstSeenAt !== null && c) results.push(c)
+      }
+      setDueConcepts(results)
+    }
+    load()
+  }, [dueNow])
 
-  const masteredCount = spread.counts.mastered + spread.counts.known
+  // Connection card — one real graph edge between met concepts
+  useEffect(() => {
+    async function load() {
+      const metConcepts = await db.concepts.filter((c) => c.firstSeenAt !== null).toArray()
+      if (metConcepts.length < 2) return
+      const metIds = new Set(metConcepts.map((c) => c.id))
+      const edges = await db.edges.toArray()
+      const valid = edges.filter((e) => metIds.has(e.fromId) && metIds.has(e.toId))
+      if (valid.length === 0) return
+      const edge = valid[Math.floor(Math.random() * valid.length)]!
+      const from = metConcepts.find((c) => c.id === edge.fromId)!
+      const to = metConcepts.find((c) => c.id === edge.toId)!
+      const yearDiff =
+        from.approxYear !== null && to.approxYear !== null
+          ? Math.abs(to.approxYear - from.approxYear)
+          : null
+      setConnectionCard({ from, to, relation: edge.relation, yearDiff })
+    }
+    load()
+  }, [learnedCount])
+
+  // AI DYK — online-only, quiet fallback
+  useEffect(() => {
+    async function load() {
+      const metConcepts = await db.concepts.filter((c) => c.firstSeenAt !== null).toArray()
+      if (metConcepts.length < 2) return
+      const a = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
+      const b = metConcepts[Math.floor(Math.random() * metConcepts.length)]!
+      if (a.id === b.id) return
+      const res = await generateDidYouKnow(a.name, a.summary, b.name, b.summary)
+      if (res.ok) setDyk({ text: res.reply })
+    }
+    if (learnedCount > 1) load()
+  }, [learnedCount > 1]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isDone = dailyStatus?.state === 'done'
+  const inProgress = dailyStatus?.state === 'in-progress'
+  const currentThread = threadSummaries.find((t) => !(t.total > 0 && t.met === t.total))
+  const completedThreads = threadSummaries.filter((t) => t.total > 0 && t.met === t.total).length
 
   return (
-    <section className="space-y-5">
-      {/* Progress header — streak, goal ring, bright stars */}
-      <div className="grid grid-cols-3 gap-2">
-        <StatChip
-          label="day streak"
-          value={snapshot.streak}
-          glyph="🔥"
-          onClick={() => onNavigate('you')}
-          accent={snapshot.streak > 0}
-        />
-        <GoalChip
-          fraction={snapshot.goalFraction}
-          done={snapshot.todayCards}
-          goal={snapshot.goalCards}
-          onClick={() => onNavigate('you')}
-        />
-        <StatChip
-          label="bright stars"
-          value={masteredCount}
-          glyph="✦"
-          onClick={() => onNavigate('you')}
-          accent={masteredCount > 0}
-        />
-      </div>
+    <section className="space-y-4">
 
-      {/* Constellation — the hero */}
-      <button
-        type="button"
-        onClick={onOpenConstellation}
-        className="group w-full overflow-hidden rounded-2xl border border-ink/[0.08] bg-bg-soft shadow-card transition-all hover:border-accent/30 active:scale-[0.995]"
-      >
-        <ConstellationPreview height={220} />
-        <div className="flex items-center justify-between px-5 pb-3 pt-1">
-          <p className="text-xs text-ink-softer">
-            <span className="font-medium text-ink-soft">{learnedCount ?? 0}</span> of{' '}
-            {conceptCount ?? 0} stars lit
-          </p>
-          <span className="text-[10px] uppercase tracking-widest text-ink-softer opacity-0 transition-opacity group-hover:opacity-100">
-            Explore graph
-          </span>
-        </div>
-      </button>
-
-      {/* The one daily action */}
+      {/* ── Today card (pinned) ── */}
       <div className="surface p-6">
-        {dailyStatus?.state === 'done' ? (
+        {isDone ? (
           <>
             <div className="flex items-baseline justify-between">
               <h2 className="font-serif text-xl text-ink">Done for today</h2>
@@ -151,16 +154,16 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
               </span>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              {dailyStatus.doneSummary
+              {dailyStatus?.doneSummary
                 ? `You learned ${dailyStatus.doneSummary.newCount} new ${
                     dailyStatus.doneSummary.newCount === 1 ? 'concept' : 'concepts'
-                  } and reviewed ${dailyStatus.doneSummary.reviewCount}. Come back tomorrow to keep the thread going.`
+                  } and reviewed ${dailyStatus.doneSummary.reviewCount}. Come back tomorrow.`
                 : 'Come back tomorrow to keep the thread going.'}
             </p>
             <button
               type="button"
               onClick={onStartPractice}
-              className="mt-5 w-full rounded-xl border border-ink/[0.08] bg-bg-softer py-2.5 text-sm text-ink-soft transition-colors hover:border-accent/30 hover:text-ink"
+              className="mt-4 w-full rounded-xl border border-ink/[0.08] bg-bg-softer py-2.5 text-sm text-ink-soft transition-colors hover:border-accent/30 hover:text-ink"
             >
               Practice more reviews
             </button>
@@ -168,23 +171,26 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
         ) : (
           <>
             <div className="flex items-baseline justify-between">
-              <h2 className="font-serif text-xl text-ink">Today's session</h2>
+              <h2 className="font-serif text-xl text-ink">
+                {inProgress && dailyStatus?.resume ? 'Continue today' : "Today's session"}
+              </h2>
               <span className="text-xs text-ink-softer">
-                <span className="tabular-nums text-ink-soft">{dueNow ?? 0}</span> due ·{' '}
-                <span className="tabular-nums text-ink-soft">{dueTomorrow ?? 0}</span> tomorrow
+                <span className="tabular-nums text-ink-soft">{dueNow ?? 0}</span> due now
               </span>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              {dailyStatus?.state === 'in-progress' && dailyStatus.resume
-                ? `You're ${dailyStatus.resume.done} of ${dailyStatus.resume.total} through. Pick up where you left off.`
-                : "Due reviews plus a few new concepts from your pathway — one composed pass, then you're done for the day."}
+              {inProgress && dailyStatus?.resume
+                ? `${dailyStatus.resume.done} of ${dailyStatus.resume.total} done — pick up where you left off.`
+                : 'Due reviews plus a few new concepts from your pathway.'}
             </p>
-            <Button onClick={onStartDaily} className="mt-5 w-full">
-              {dailyStatus?.state === 'in-progress' && dailyStatus.resume
+            <Button onClick={onStartDaily} className="mt-4 w-full">
+              {inProgress && dailyStatus?.resume
                 ? `Continue — ${dailyStatus.resume.remaining} left`
                 : 'Begin today'}
             </Button>
-            <div className="mt-3 flex items-center justify-between">
+
+            {/* Listen mode toggle */}
+            <div className="mt-3 flex items-center justify-between border-t border-ink/[0.06] pt-3">
               <span className="flex items-center gap-1.5 text-[11px] text-ink-softer">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -195,10 +201,10 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
               <button
                 type="button"
                 onClick={() => updatePrefs({ listenMode: !prefs.listenMode })}
-                className={`rounded-full px-3 py-0.5 text-[11px] border transition-colors ${
+                className={`rounded-full border px-3 py-0.5 text-[11px] transition-colors ${
                   prefs.listenMode
                     ? 'border-accent/50 bg-accent/10 text-accent'
-                    : 'border-ink/[0.10] text-ink-softer hover:border-accent/30 hover:text-ink-soft'
+                    : 'border-ink/[0.10] text-ink-softer hover:border-accent/30'
                 }`}
               >
                 {prefs.listenMode ? 'On' : 'Off'}
@@ -208,8 +214,34 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
         )}
       </div>
 
-      {/* Story preview card — next concept waiting in the pathway */}
-      {nextConcept && dailyStatus?.state !== 'done' && (
+      {/* ── Inline review teasers ── */}
+      {dueConcepts.length > 0 && !isDone && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer px-1">
+            Ready to review
+          </p>
+          {dueConcepts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={onStartDaily}
+              className="group flex w-full items-center gap-3 rounded-2xl border border-ink/[0.07] bg-bg-soft/70 px-4 py-3 text-left transition-all hover:border-accent/30 active:scale-[0.99]"
+            >
+              <span className={`h-2 w-2 shrink-0 rounded-full ${DOMAIN_DOT[c.domain] ?? 'bg-accent/40'}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink">{c.name}</span>
+                <span className="text-[11px] capitalize text-ink-softer">{c.domain.replace('_', ' ')}</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+                due
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Story brief preview card ── */}
+      {nextConcept && (
         <button
           type="button"
           onClick={() => onOpenStoryBrief(nextConcept.concept, nextConcept.threadName)}
@@ -231,69 +263,34 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
         </button>
       )}
 
-      {/* Pathway strip */}
-      {threadSummaries.length > 0 && (() => {
-        const current = threadSummaries.find((t) => !(t.total > 0 && t.met === t.total))
-        const completed = threadSummaries.filter((t) => t.total > 0 && t.met === t.total).length
-        return (
+      {/* ── Connection card ── */}
+      {connectionCard && (
+        <div className="rounded-2xl border border-ink/[0.07] bg-bg-soft/60 p-5">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">
+            In your constellation
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-ink">
+            <span className="font-semibold text-accent">{connectionCard.from.name}</span>
+            {' '}
+            <span className="text-ink-soft">{RELATION_PHRASE[connectionCard.relation]}</span>
+            {' '}
+            <span className="font-semibold text-accent">{connectionCard.to.name}</span>
+            {connectionCard.yearDiff && connectionCard.yearDiff > 5 ? (
+              <span className="text-ink-softer"> — {connectionCard.yearDiff} years apart</span>
+            ) : null}
+          </p>
           <button
             type="button"
-            onClick={() => onNavigate('atlas')}
-            className="group flex w-full items-center gap-4 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99]"
+            onClick={onOpenConstellation}
+            className="mt-3 text-[11px] text-accent/70 hover:text-accent"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="5" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="12" cy="19" r="2" />
-                <path d="M12 7v3M12 14v3" />
-              </svg>
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[10px] uppercase tracking-wide text-ink-softer">
-                Your pathway · {completed}/{threadSummaries.length} stories
-              </span>
-              <span className="block truncate text-sm font-medium text-ink">
-                {current ? current.name : 'All stories complete'}
-              </span>
-            </span>
-            <span className="text-ink-softer transition-transform group-hover:translate-x-0.5">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </span>
+            Explore your graph →
           </button>
-        )
-      })()}
-
-      {/* Mastery spread bar */}
-      {spread.total > 0 && (
-        <div className="space-y-2">
-          <div className="flex h-2 overflow-hidden rounded-full bg-bg-softer">
-            {MASTERY_ORDER.map((level) => {
-              const count = spread.counts[level]
-              if (count === 0 || level === 'new') return null
-              return (
-                <div
-                  key={level}
-                  style={{
-                    width: `${(count / spread.total) * 100}%`,
-                    opacity: 0.25 + MASTERY_META[level].brightness * 0.75,
-                  }}
-                  className="h-full bg-accent"
-                  title={`${count} ${MASTERY_META[level].label}`}
-                />
-              )
-            })}
-          </div>
-          <p className="text-[11px] text-ink-softer">
-            {Math.round(spread.fraction * 100)}% mastery across {spread.total} concepts
-          </p>
         </div>
       )}
 
-      {/* AI did-you-know (Wave 4) — online-only, quiet fallback */}
-      {dyk?.loaded && dyk.text && (
+      {/* ── AI did-you-know ── */}
+      {dyk && (
         <div className="rounded-2xl border border-accent/[0.15] bg-accent/[0.04] p-5">
           <p className="text-[10px] font-medium uppercase tracking-widest text-accent/70">
             Did you know · AI
@@ -309,83 +306,65 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
         </div>
       )}
 
-      <p className="text-xs leading-relaxed text-ink-softer">
-        Forgetting is normal and expected. The cards that feel hardest are the ones the scheduler is working on for you.
+      {/* ── Pathway nudge ── */}
+      {threadSummaries.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigate('atlas')}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 p-4 text-left transition-all hover:border-accent/40 active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+              <path d="M12 7v3M12 14v3" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] uppercase tracking-wide text-ink-softer">
+              Your pathway · {completedThreads}/{threadSummaries.length} stories
+            </span>
+            <span className="block truncate text-sm font-medium text-ink">
+              {currentThread ? currentThread.name : 'All stories complete'}
+            </span>
+          </span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-softer transition-transform group-hover:translate-x-0.5">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      )}
+
+      {/* ── Collections (if any) ── */}
+      {collections.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigate('atlas')}
+          className="group w-full rounded-2xl border border-ink/[0.08] bg-bg-soft/70 p-4 text-left transition-all hover:border-accent/30 active:scale-[0.99]"
+        >
+          <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">
+            Your collections
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {collections.slice(0, 4).map((col) => (
+              <span
+                key={col.id}
+                className="rounded-full border border-ink/[0.08] bg-bg-softer/60 px-3 py-1 text-[12px] text-ink-soft"
+              >
+                {col.name}
+              </span>
+            ))}
+            {collections.length > 4 && (
+              <span className="rounded-full border border-ink/[0.08] bg-bg-softer/60 px-3 py-1 text-[12px] text-ink-softer">
+                +{collections.length - 4} more
+              </span>
+            )}
+          </div>
+        </button>
+      )}
+
+      {/* ── Footer blurb ── */}
+      <p className="pb-2 text-xs leading-relaxed text-ink-softer">
+        Forgetting is normal. The cards that feel hardest are the ones the scheduler is working on for you.
       </p>
     </section>
-  )
-}
-
-function StatChip({
-  label,
-  value,
-  glyph,
-  accent,
-  onClick,
-}: {
-  label: string
-  value: number
-  glyph: string
-  accent?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col items-center gap-0.5 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-3 transition-colors hover:border-accent/30"
-    >
-      <span className="text-lg leading-none">{glyph}</span>
-      <span className={`text-xl font-semibold tabular-nums ${accent ? 'text-accent' : 'text-ink'}`}>
-        {value}
-      </span>
-      <span className="text-[10px] uppercase tracking-wide text-ink-softer">{label}</span>
-    </button>
-  )
-}
-
-function GoalChip({
-  fraction,
-  done,
-  goal,
-  onClick,
-}: {
-  fraction: number
-  done: number
-  goal: number
-  onClick: () => void
-}) {
-  const r = 16
-  const c = 2 * Math.PI * r
-  const met = done >= goal
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col items-center gap-0.5 rounded-2xl border border-ink/[0.08] bg-bg-soft/70 px-2 py-3 transition-colors hover:border-accent/30"
-    >
-      <svg width="40" height="40" viewBox="0 0 40 40" className="-mb-0.5">
-        <circle cx="20" cy="20" r={r} fill="none" className="stroke-ink/[0.12]" strokeWidth="4" />
-        <circle
-          cx="20"
-          cy="20"
-          r={r}
-          fill="none"
-          stroke={met ? '#4ade80' : '#28486B'}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - fraction)}
-          transform="rotate(-90 20 20)"
-          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-        />
-        <text x="20" y="24" textAnchor="middle" className="fill-ink text-[10px] font-semibold">
-          {met ? '✓' : done}
-        </text>
-      </svg>
-      <span className="text-[10px] uppercase tracking-wide text-ink-softer">
-        {met ? 'goal met' : `${done}/${goal} today`}
-      </span>
-    </button>
   )
 }
