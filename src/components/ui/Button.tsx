@@ -9,7 +9,7 @@ export function Button({ variant = 'primary', className = '', children, ...rest 
   const base =
     'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-transform active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100'
   const styles = {
-    primary: 'bg-accent-grad text-bg shadow-glow',
+    primary: 'bg-accent-grad text-on-accent shadow-glow',
     ghost: 'text-ink-soft hover:text-ink',
     soft: 'border border-white/10 bg-bg-raised text-ink hover:border-accent/50',
   }[variant]

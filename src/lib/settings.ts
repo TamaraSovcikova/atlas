@@ -1,4 +1,5 @@
 export type Intensity = 'playful' | 'balanced' | 'serious'
+export type Theme = 'dark' | 'light'
 
 export interface Prefs {
   intensity: Intensity
@@ -13,6 +14,10 @@ export interface Prefs {
   dailyGoalCards: number
   /** Streak freezes available to bridge isolated missed days. */
   streakFreezes: number
+  /** Visual theme. */
+  theme: Theme
+  /** Show the due-review count on the installed app icon (Badging API). */
+  dueBadge: boolean
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -25,7 +30,11 @@ export const DEFAULT_PREFS: Prefs = {
   showConstellationReveal: true,
   dailyGoalCards: 12,
   streakFreezes: 2,
+  theme: 'dark',
+  dueBadge: true,
 }
+
+export const MAX_STREAK_FREEZES = 5
 
 export const GOAL_OPTIONS = [6, 12, 20, 30] as const
 

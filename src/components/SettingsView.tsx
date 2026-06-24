@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../store/useSettings'
-import { INTENSITY_LABEL, GOAL_OPTIONS, type Intensity } from '../lib/settings'
+import {
+  INTENSITY_LABEL,
+  GOAL_OPTIONS,
+  MAX_STREAK_FREEZES,
+  type Intensity,
+  type Theme,
+} from '../lib/settings'
 import { downloadBackup, importBackup } from '../lib/backup'
 import {
   ensureSyncToken,
@@ -13,8 +19,17 @@ import {
 } from '../lib/sync'
 
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
+const THEMES: { key: Theme; label: string }[] = [
+  { key: 'dark', label: 'Dark' },
+  { key: 'light', label: 'Light' },
+]
 
-export function SettingsView() {
+interface Props {
+  canInstall: boolean
+  onInstall: () => void
+}
+
+export function SettingsView({ canInstall, onInstall }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const update = useSettings((s) => s.update)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -112,10 +127,78 @@ export function SettingsView() {
             )
           })}
         </div>
-        <p className="text-xs text-ink-softer">
-          🛡️ {prefs.streakFreezes} streak freeze{prefs.streakFreezes === 1 ? '' : 's'} in reserve —
-          they bridge a missed day so one gap doesn't reset your streak.
-        </p>
+        <div className="flex items-center justify-between rounded-2xl border border-bg-softer/40 bg-bg-soft/50 p-4">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-ink">🛡️ Streak freezes</span>
+            <span className="block text-xs text-ink-softer">
+              They bridge a missed day so one gap doesn't reset your streak.
+            </span>
+          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              aria-label="Fewer freezes"
+              disabled={prefs.streakFreezes <= 0}
+              onClick={() => update({ streakFreezes: Math.max(0, prefs.streakFreezes - 1) })}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-bg-softer/40 text-ink-soft transition-colors hover:border-accent/40 disabled:opacity-30"
+            >
+              −
+            </button>
+            <span className="w-5 text-center text-lg font-semibold tabular-nums text-ink">
+              {prefs.streakFreezes}
+            </span>
+            <button
+              type="button"
+              aria-label="More freezes"
+              disabled={prefs.streakFreezes >= MAX_STREAK_FREEZES}
+              onClick={() =>
+                update({ streakFreezes: Math.min(MAX_STREAK_FREEZES, prefs.streakFreezes + 1) })
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-bg-softer/40 text-ink-soft transition-colors hover:border-accent/40 disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Appearance */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Appearance</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {THEMES.map((t) => {
+            const active = prefs.theme === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => update({ theme: t.key })}
+                className={`rounded-2xl border py-3 text-center text-sm transition-colors ${
+                  active
+                    ? 'border-accent/70 bg-accent/10 text-accent'
+                    : 'border-bg-softer/40 bg-bg-soft/50 text-ink hover:border-accent/40'
+                }`}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+        <Toggle
+          label="Due count on app icon"
+          desc="Badge the installed app icon with how many reviews are waiting."
+          value={prefs.dueBadge}
+          onChange={(v) => update({ dueBadge: v })}
+        />
+        {canInstall && (
+          <button
+            type="button"
+            onClick={onInstall}
+            className="w-full rounded-2xl border border-accent/40 bg-accent/10 py-3 text-sm text-accent transition-colors hover:bg-accent/15"
+          >
+            Install Atlas on this device
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">

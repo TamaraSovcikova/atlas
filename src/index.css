@@ -71,6 +71,32 @@
 @tailwind utilities;
 
 @layer base {
+  /* Themeable palette. Tailwind colors reference these via rgb(var(--x)). */
+  :root {
+    --bg: 26 20 16;
+    --bg-soft: 34 28 21;
+    --bg-softer: 44 37 27;
+    --bg-raised: 55 46 34;
+    --ink: 244 238 223;
+    --ink-soft: 197 184 156;
+    --ink-softer: 133 117 104;
+    /* Hairlines and shadows tuned per theme. */
+    --bloom: rgba(215, 148, 36, 0.07);
+    --grain-opacity: 1;
+  }
+
+  :root[data-theme='light'] {
+    --bg: 247 243 235;
+    --bg-soft: 255 252 246;
+    --bg-softer: 238 231 219;
+    --bg-raised: 255 255 255;
+    --ink: 40 32 24;
+    --ink-soft: 92 80 66;
+    --ink-softer: 140 124 106;
+    --bloom: rgba(215, 148, 36, 0.1);
+    --grain-opacity: 0.4;
+  }
+
   html,
   body,
   #root {
@@ -78,9 +104,9 @@
   }
 
   body {
-    background-color: #1a1410;
+    background-color: rgb(var(--bg));
     /* Single warm amber bloom near the top -- observatory lamp quality */
-    background-image: radial-gradient(ellipse 1000px 600px at 50% -8%, rgba(215, 148, 36, 0.07), transparent 65%);
+    background-image: radial-gradient(ellipse 1000px 600px at 50% -8%, var(--bloom), transparent 65%);
     background-attachment: fixed;
     -webkit-tap-highlight-color: transparent;
   }
@@ -92,7 +118,7 @@
     inset: 0;
     pointer-events: none;
     z-index: 9000;
-    opacity: 1;
+    opacity: var(--grain-opacity);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23g)' opacity='0.035'/%3E%3C/svg%3E");
     background-size: 250px 250px;
   }
@@ -118,5 +144,21 @@
   }
   .chip {
     @apply rounded-full border border-white/10 bg-bg-raised px-4 py-2 text-sm text-ink transition-all active:scale-95;
+  }
+
+  /* Light theme: the dark-tuned white hairlines and heavy shadows read wrong on
+     a pale background, so retune the shared surfaces to ink-toned borders and
+     softer shadows. */
+  :root[data-theme='light'] .surface {
+    border-color: rgba(40, 32, 24, 0.1);
+    box-shadow: 0 1px 2px rgba(40, 32, 24, 0.04), 0 8px 24px -16px rgba(40, 32, 24, 0.25);
+    background-image: none;
+  }
+  :root[data-theme='light'] .surface-raised {
+    border-color: rgba(40, 32, 24, 0.12);
+    box-shadow: 0 1px 2px rgba(40, 32, 24, 0.05), 0 12px 32px -14px rgba(40, 32, 24, 0.3);
+  }
+  :root[data-theme='light'] .chip {
+    border-color: rgba(40, 32, 24, 0.12);
   }
 }

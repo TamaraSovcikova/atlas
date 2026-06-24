@@ -4,17 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm Observatory dark -- deep ink, not blue-black
+        // Warm Observatory palette, themeable via CSS variables (see index.css).
         bg: {
-          DEFAULT: '#1a1410',
-          soft: '#221c15',
-          softer: '#2c251b',
-          raised: '#372e22',
+          DEFAULT: 'rgb(var(--bg) / <alpha-value>)',
+          soft: 'rgb(var(--bg-soft) / <alpha-value>)',
+          softer: 'rgb(var(--bg-softer) / <alpha-value>)',
+          raised: 'rgb(var(--bg-raised) / <alpha-value>)',
         },
         ink: {
-          DEFAULT: '#f4eedf',
-          soft: '#c5b89c',
-          softer: '#857568',
+          DEFAULT: 'rgb(var(--ink) / <alpha-value>)',
+          soft: 'rgb(var(--ink-soft) / <alpha-value>)',
+          softer: 'rgb(var(--ink-softer) / <alpha-value>)',
         },
         // Amber: the one saturated accent. Domain hues live only in Constellation.
         accent: {
@@ -25,6 +25,9 @@ export default {
         },
         good: '#4ade80',
         bad: '#f87171',
+        // Fixed dark for text/icons sitting on the amber accent. Theme-independent
+        // (the accent stays amber in both themes), so it must not follow --bg.
+        'on-accent': '#1a1410',
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],

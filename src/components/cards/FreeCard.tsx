@@ -53,7 +53,7 @@ export function FreeCard({ item, onAnswered, onRevealed, onConceptClick }: Props
           <button
             type="button"
             onClick={reveal}
-            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-bg hover:bg-accent-soft"
+            className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-on-accent hover:bg-accent-soft"
           >
             Reveal
           </button>

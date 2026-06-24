@@ -15,6 +15,11 @@ import { Onboarding } from './components/Onboarding'
 
 const ONBOARDED_KEY = 'onboarded:v1'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 export type SessionConfig =
   | { shape: 'daily' }
   | { shape: 'era'; eraId: string }
@@ -29,7 +34,9 @@ function App() {
   const [session, setSession] = useState<{ config: SessionConfig; returnTo: Tab } | null>(null)
   const [constellationOpen, setConstellationOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const loadSettings = useSettings((s) => s.load)
+  const prefs = useSettings((s) => s.prefs)
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +60,59 @@ function App() {
     await db.settings.put({ key: ONBOARDED_KEY, value: true })
     setShowOnboarding(false)
   }
+
+  // Apply the visual theme to <html> so CSS variables switch palette.
+  useEffect(() => {
+    document.documentElement.dataset.theme = prefs.theme
+  }, [prefs.theme])
+
+  // Capture the install prompt so Settings can offer "Install Atlas".
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function promptInstall() {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    setInstallPrompt(null)
+  }
+
+  // Badge the installed app icon with the count of due reviews (met concepts).
+  useEffect(() => {
+    let active = true
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n?: number) => Promise<void>
+      clearAppBadge?: () => Promise<void>
+    }
+    if (!nav.setAppBadge) return
+    async function update() {
+      if (!prefs.dueBadge) {
+        nav.clearAppBadge?.()
+        return
+      }
+      const dueReviews = await db.reviews.where('dueAt').belowOrEqual(Date.now()).toArray()
+      let count = 0
+      for (const r of dueReviews) {
+        const c = await db.concepts.get(r.conceptId)
+        if (c?.firstSeenAt != null) count++
+      }
+      if (!active) return
+      if (count > 0) nav.setAppBadge?.(count)
+      else nav.clearAppBadge?.()
+    }
+    update()
+    const onFocus = () => update()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      active = false
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [prefs.dueBadge, session])
 
   function startSession(config: SessionConfig, returnTo: Tab = tab) {
     setConstellationOpen(false)
@@ -154,7 +214,9 @@ function App() {
               />
             )}
             {tab === 'stats' && <StatsView />}
-            {tab === 'settings' && <SettingsView />}
+            {tab === 'settings' && (
+              <SettingsView canInstall={!!installPrompt} onInstall={promptInstall} />
+            )}
           </div>
         </div>
 
