@@ -40,7 +40,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 ## Current state
 
-2026-06-24: main=`cf2b12d`. Wave 0 editorial/paper reskin complete. New visual identity: paper #F6F2EA / ink #221D16 / deep-blue #28486B as default theme (CSS vars in index.css :root); cool dark navy as [data-theme=dark] override. 3-tab IA: Feed / Atlas / You (was 5-tab). Atlas sub-routes Pathway|Browse; You sub-routes Progress|Settings via SegmentControl. Fraunces serif header in accent deep-blue. 38 tests. Full 2.0 plan in `~/workspace/Projects/Atlas/docs/ATLAS_2.0.md`. NEXT: Wave 1 -- feed-first home shell, Story Brief 3-beat format, free audio via Web Speech API.
+2026-06-24: main=`2caad1f`. Wave 0+1 complete + full paper theme polish. Wave 0: editorial/paper identity (paper #F6F2EA / ink #221D16 / deep-blue #28486B); CSS-var shadows per theme; 3-tab IA Feed/Atlas/You; SegmentControl sub-panel routing (Atlas->Pathway|Browse; You->Progress|Settings); serif Fraunces header. Wave 1: StoryBrief.tsx (3-beat tap-through overlay Hook/Story/Connection before session start, db.edges for graph neighbours, Web Speech API audio at rate 0.92); feed story preview card in HomeView (getNextPathwayConcept, honours tier-gate); all border-white/* hardcodes replaced with border-ink/* across all components -- paper theme fully coherent. 38 tests. Full 2.0 plan in `~/workspace/Projects/Atlas/docs/ATLAS_2.0.md`. NEXT: Wave 2 -- Collections surface, mood/energy session entry, "You" identity. Deferred: heatmap + constellation colour tuning (still use rgba hardcodes).
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 
