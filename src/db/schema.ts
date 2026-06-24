@@ -24,7 +24,7 @@ export type Region = 'uk' | 'slovak_eu' | 'world'
 
 export type RecallFormat = 'cloze' | 'cloze_chips' | 'contrast' | 'free' | 'map'
 
-export type SessionShape = 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes'
+export type SessionShape = 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes' | 'collection'
 
 export interface Era {
   id: string
@@ -132,6 +132,20 @@ export interface Session {
   eraId: string | null
   domain: Domain | null
   threadId?: string | null
+  collectionId?: string | null
+}
+
+export interface Collection {
+  id: string
+  name: string
+  createdAt: number
+}
+
+export interface CollectionConcept {
+  id?: number
+  collectionId: string
+  conceptId: string
+  addedAt: number
 }
 
 export interface NewsItem {
@@ -161,6 +175,8 @@ export class AtlasDB extends Dexie {
   settings!: Table<SettingsKv, string>
   eras!: Table<Era, string>
   threads!: Table<Thread, string>
+  collections!: Table<Collection, string>
+  collectionConcepts!: Table<CollectionConcept, number>
 
   constructor() {
     super('atlas')
@@ -204,6 +220,21 @@ export class AtlasDB extends Dexie {
       settings: 'key',
       eras: 'id, displayOrder',
       threads: 'id, displayOrder',
+    })
+    // v4 adds collections and collectionConcepts tables. Purely additive -- no
+    // existing data is touched.
+    this.version(4).stores({
+      concepts: 'id, name, domain, approxYear, lastReviewedAt, *eras, *threads',
+      edges: '++id, fromId, toId, [fromId+toId], isPersonal',
+      lessons: 'id, conceptId',
+      reviews: '++id, conceptId, dueAt, state',
+      sessions: '++id, startedAt',
+      news: 'id, date, region',
+      settings: 'key',
+      eras: 'id, displayOrder',
+      threads: 'id, displayOrder',
+      collections: 'id, createdAt',
+      collectionConcepts: '++id, collectionId, conceptId, [collectionId+conceptId]',
     })
   }
 }

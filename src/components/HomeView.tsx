@@ -27,6 +27,7 @@ interface Props {
 
 export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, onNavigate, onOpenStoryBrief }: Props) {
   const prefs = useSettings((s) => s.prefs)
+  const updatePrefs = useSettings((s) => s.update)
 
   const conceptCount = useLiveQuery(() => db.concepts.count(), [], 0)
   const learnedCount = useLiveQuery(
@@ -165,6 +166,26 @@ export function HomeView({ onStartDaily, onStartPractice, onOpenConstellation, o
                 ? `Continue — ${dailyStatus.resume.remaining} left`
                 : 'Begin today'}
             </Button>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[11px] text-ink-softer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+                Listen mode
+              </span>
+              <button
+                type="button"
+                onClick={() => updatePrefs({ listenMode: !prefs.listenMode })}
+                className={`rounded-full px-3 py-0.5 text-[11px] border transition-colors ${
+                  prefs.listenMode
+                    ? 'border-accent/50 bg-accent/10 text-accent'
+                    : 'border-ink/[0.10] text-ink-softer hover:border-accent/30 hover:text-ink-soft'
+                }`}
+              >
+                {prefs.listenMode ? 'On' : 'Off'}
+              </button>
+            </div>
           </>
         )}
       </div>

@@ -12,6 +12,7 @@ import { StatsView } from './components/StatsView'
 import { SettingsView } from './components/SettingsView'
 import { SessionView } from './components/SessionView'
 import { ConstellationScreen } from './components/ConstellationScreen'
+import { CollectionsView } from './components/CollectionsView'
 import { Onboarding } from './components/Onboarding'
 
 const ONBOARDED_KEY = 'onboarded:v1'
@@ -28,8 +29,9 @@ export type SessionConfig =
   | { shape: 'thread'; threadId: string }
   | { shape: 'spaced' }
   | { shape: 'mistakes' }
+  | { shape: 'collection'; collectionId: string }
 
-type AtlasPanel = 'pathway' | 'browse'
+type AtlasPanel = 'pathway' | 'browse' | 'collections'
 type YouPanel = 'progress' | 'settings'
 
 function App() {
@@ -166,6 +168,7 @@ function App() {
             eraId={cfg.shape === 'era' ? cfg.eraId : null}
             domain={cfg.shape === 'domain' ? cfg.domain : null}
             threadId={cfg.shape === 'thread' ? cfg.threadId : null}
+            collectionId={cfg.shape === 'collection' ? cfg.collectionId : null}
             onFinished={endSession}
             onCancel={endSession}
           />
@@ -236,6 +239,7 @@ function App() {
                   options={[
                     { key: 'pathway' as AtlasPanel, label: 'Pathway' },
                     { key: 'browse' as AtlasPanel, label: 'Browse' },
+                    { key: 'collections' as AtlasPanel, label: 'Collections' },
                   ]}
                   active={atlasPanel}
                   onChange={setAtlasPanel}
@@ -258,6 +262,13 @@ function App() {
                     }
                     onStartSpaced={() => startSession({ shape: 'spaced' }, 'atlas')}
                     onStartMistakes={() => startSession({ shape: 'mistakes' }, 'atlas')}
+                  />
+                )}
+                {atlasPanel === 'collections' && (
+                  <CollectionsView
+                    onStudy={(collectionId) =>
+                      startSession({ shape: 'collection', collectionId }, 'atlas')
+                    }
                   />
                 )}
               </div>

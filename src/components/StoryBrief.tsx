@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { db } from '../db/schema'
 import type { Concept } from '../db/schema'
 import type { RelationType } from '../db/schema'
+import { useSettings } from '../store/useSettings'
 
 function firstSentence(text: string): string {
   const idx = text.indexOf('. ')
@@ -35,6 +36,7 @@ interface Props {
 const TOTAL_BEATS = 3
 
 export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
+  const listenMode = useSettings((s) => s.prefs.listenMode)
   const [beat, setBeat] = useState(0)
   const [neighbours, setNeighbours] = useState<KnownNeighbour[]>([])
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -61,6 +63,30 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
       window.speechSynthesis?.cancel()
     }
   }, [concept.id])
+
+  // Auto-play each beat in listen mode. Depends on `beat` and `neighbours`
+  // (beat 2 text is built from neighbours, so we wait for them to load).
+  useEffect(() => {
+    if (!listenMode || !window.speechSynthesis) return
+    const text = [
+      `${concept.name}. ${firstSentence(concept.summary)}`,
+      concept.summary,
+      neighbours.length > 0
+        ? `${concept.name} connects to: ${neighbours.map((n) => n.name).join(', ')}.`
+        : `${concept.name} is a foundation concept.`,
+    ][beat]
+    if (!text) return
+    window.speechSynthesis.cancel()
+    const utt = new SpeechSynthesisUtterance(text)
+    utt.rate = 0.92
+    utt.onend = () => setSpeaking(false)
+    utt.onerror = () => setSpeaking(false)
+    setSpeaking(true)
+    window.speechSynthesis.speak(utt)
+    return () => {
+      window.speechSynthesis?.cancel()
+    }
+  }, [listenMode, beat, neighbours, concept.id])
 
   function stopSpeech() {
     window.speechSynthesis?.cancel()

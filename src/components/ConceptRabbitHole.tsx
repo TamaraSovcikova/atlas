@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Drawer } from 'vaul'
-import { db, type Thread } from '../db/schema'
+import { db, type Thread, type Collection } from '../db/schema'
 import { masteryOf, MASTERY_META } from '../lib/mastery'
 import { LinkedText } from './LinkedText'
 
@@ -20,9 +20,13 @@ function formatDue(dueAt: number): string {
 
 export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
   const [extraStack, setExtraStack] = useState<string[]>([])
+  const [showSavePicker, setShowSavePicker] = useState(false)
+  const [newColName, setNewColName] = useState('')
 
   useEffect(() => {
     setExtraStack([])
+    setShowSavePicker(false)
+    setNewColName('')
   }, [rootConceptId])
 
   const fullStack = rootConceptId ? [rootConceptId, ...extraStack] : []
@@ -53,6 +57,34 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
   const masteryMeta = MASTERY_META[mastery]
 
   const canGoBack = fullStack.length > 1
+
+  const collections = useLiveQuery(() => db.collections.orderBy('createdAt').toArray(), [], [] as Collection[])
+
+  const savedInCollections = useLiveQuery(async () => {
+    if (!currentId) return new Set<string>()
+    const rows = await db.collectionConcepts.where('conceptId').equals(currentId).toArray()
+    return new Set(rows.map((r) => r.collectionId))
+  }, [currentId], new Set<string>())
+
+  async function toggleSave(collectionId: string) {
+    if (!currentId) return
+    const existing = await db.collectionConcepts
+      .where('[collectionId+conceptId]').equals([collectionId, currentId]).first()
+    if (existing) {
+      await db.collectionConcepts.delete(existing.id!)
+    } else {
+      await db.collectionConcepts.add({ collectionId, conceptId: currentId, addedAt: Date.now() })
+    }
+  }
+
+  async function createAndSave() {
+    const name = newColName.trim()
+    if (!name || !currentId) return
+    const id = `col_${Date.now()}`
+    await db.collections.put({ id, name, createdAt: Date.now() })
+    await db.collectionConcepts.add({ collectionId: id, conceptId: currentId, addedAt: Date.now() })
+    setNewColName('')
+  }
 
   function drillInto(id: string) {
     setExtraStack((prev) => [...prev, id])
@@ -87,14 +119,75 @@ export function ConceptRabbitHole({ rootConceptId, onClose }: Props) {
             <Drawer.Title className="font-serif text-base text-ink">
               {concept?.name ?? '...'}
             </Drawer.Title>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-[11px] uppercase tracking-wider text-ink-softer hover:text-ink"
-            >
-              Return
-            </button>
+            <div className="flex items-center gap-3">
+              {concept && (
+                <button
+                  type="button"
+                  onClick={() => setShowSavePicker((v) => !v)}
+                  title="Save to collection"
+                  className={`text-[11px] uppercase tracking-wider transition-colors ${
+                    savedInCollections.size > 0 ? 'text-accent' : 'text-ink-softer hover:text-ink'
+                  }`}
+                >
+                  {savedInCollections.size > 0 ? 'Saved' : 'Save'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-[11px] uppercase tracking-wider text-ink-softer hover:text-ink"
+              >
+                Return
+              </button>
+            </div>
           </div>
+
+          {showSavePicker && (
+            <div className="shrink-0 border-t border-ink/[0.08] px-6 py-3 space-y-2">
+              {collections.length === 0 ? (
+                <p className="text-[11px] text-ink-softer">No collections yet — create one below.</p>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {collections.map((col) => {
+                    const saved = savedInCollections.has(col.id)
+                    return (
+                      <li key={col.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSave(col.id)}
+                          className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${
+                            saved
+                              ? 'border-accent/50 bg-accent/10 text-accent'
+                              : 'border-ink/[0.10] text-ink-softer hover:border-accent/40 hover:text-ink'
+                          }`}
+                        >
+                          {saved ? '✓ ' : ''}{col.name}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newColName}
+                  onChange={(e) => setNewColName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createAndSave()}
+                  placeholder="New collection…"
+                  className="flex-1 rounded-lg border border-ink/[0.08] bg-bg-raised px-3 py-1.5 text-[11px] text-ink outline-none placeholder:text-ink-softer focus:border-accent/40"
+                />
+                <button
+                  type="button"
+                  onClick={createAndSave}
+                  disabled={!newColName.trim()}
+                  className="rounded-lg border border-ink/[0.10] px-3 py-1.5 text-[11px] text-ink-soft hover:border-accent/40 hover:text-ink disabled:opacity-40"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          )}
 
           <Drawer.Description className="sr-only">
             Explore this concept. Tap linked terms to go deeper, or Return to go back to your card.

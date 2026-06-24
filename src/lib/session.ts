@@ -61,6 +61,7 @@ export interface SessionPlan {
   eraId: string | null
   domain: Domain | null
   threadId: string | null
+  collectionId?: string | null
 }
 
 export const DEFAULT_NEW_PER_DOMAIN = 1
@@ -914,4 +915,39 @@ export async function summariseDomains(now = Date.now()): Promise<Map<Domain, Do
     if (review && review.dueAt <= now) s.due++
   }
   return summaries
+}
+
+/** Build a focused session from a user's saved collection. All concepts in the
+ *  collection are included: unseen ones are introduced (isNew=true), already-seen
+ *  ones are shown as reviews regardless of their due date so the user can
+ *  deliberately practise what they've saved. */
+export async function buildCollectionSession(
+  collectionId: string,
+  prefs: Prefs,
+): Promise<SessionPlan> {
+  const policy = resolvePolicy(prefs)
+  const members = await db.collectionConcepts.where('collectionId').equals(collectionId).toArray()
+  if (members.length === 0) {
+    return { items: [], newCount: 0, reviewCount: 0, shape: 'collection', eraId: null, domain: null, threadId: null, collectionId }
+  }
+  const conceptIds = members.map((m) => m.conceptId)
+  const concepts = (await db.concepts.bulkGet(conceptIds)).filter((c): c is Concept => c !== undefined)
+  const reviews = await db.reviews.where('conceptId').anyOf(conceptIds).toArray()
+  const reviewByConceptId = new Map(reviews.map((r) => [r.conceptId, r]))
+  const recall: RecallItem[] = []
+  let rot = 0
+  for (const concept of concepts) {
+    const review = reviewByConceptId.get(concept.id)
+    const isNew = concept.firstSeenAt === null
+    if (!review) continue
+    const item = await makeRecallItem(concept, review, isNew, policy, 'col', rot++)
+    if (item) recall.push(item)
+  }
+  const items = injectGames(recall, policy)
+  let newCount = 0, reviewCount = 0
+  for (const it of items) {
+    if (it.kind === 'recall') { if (it.isNew) newCount++; else reviewCount++ }
+    else reviewCount += it.entries.length
+  }
+  return { items, newCount, reviewCount, shape: 'collection', eraId: null, domain: null, threadId: null, collectionId }
 }

@@ -13,6 +13,7 @@ import {
   saveSessionProgress,
   completeSession,
 } from '../lib/dailyPlan'
+import { buildCollectionSession } from '../lib/session'
 import { applyRating, type RecallRating } from '../lib/fsrs'
 import { getSyncToken, pushToCloud } from '../lib/sync'
 import { db, type Domain, type Era } from '../db/schema'
@@ -27,10 +28,11 @@ import { ConstellationPreview } from './ConstellationPreview'
 import { M, AnimatePresence, cardVariants, cardTransition, ease, type SwipeDir } from './ui/motion'
 
 interface Props {
-  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes'
+  shape: 'era' | 'domain' | 'spaced' | 'thread' | 'daily' | 'mistakes' | 'collection'
   eraId: string | null
   domain: Domain | null
   threadId: string | null
+  collectionId?: string | null
   onFinished: () => void
   onCancel: () => void
 }
@@ -84,11 +86,12 @@ async function recordRating(conceptId: string, rating: RecallRating, now: number
   }
 }
 
-export function SessionView({ shape, eraId, domain, threadId, onFinished, onCancel }: Props) {
+export function SessionView({ shape, eraId, domain, threadId, collectionId, onFinished, onCancel }: Props) {
   const prefs = useSettings((s) => s.prefs)
   const [plan, setPlan] = useState<SessionPlan | null>(null)
   const [era, setEra] = useState<Era | null>(null)
   const [threadName, setThreadName] = useState<string | null>(null)
+  const [collectionName, setCollectionName] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
   const [startedAt, setStartedAt] = useState(() => Date.now())
   const [ratings, setRatings] = useState<RecallRating[]>([])
@@ -172,6 +175,15 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
         if (p.items.length === 0) setDone(true)
         else setActiveConcept(primaryConceptId(p.items[Math.min(state.cursor, p.items.length - 1)]!))
         return
+      } else if (shape === 'collection' && collectionId) {
+        p = await buildCollectionSession(collectionId, prefs)
+        if (cancelled) return
+        const col = await db.collections.get(collectionId)
+        if (!cancelled && col) setCollectionName(col.name)
+        setPlan(p)
+        if (p.items.length === 0) setDone(true)
+        else setActiveConcept(primaryConceptId(p.items[0]!))
+        return
       } else {
         const state = await resumeOrBuildSession('spaced', null, prefs)
         if (cancelled) return
@@ -191,7 +203,7 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shape, eraId, domain, threadId])
+  }, [shape, eraId, domain, threadId, collectionId])
 
   // Reset swipe zone state when the card changes
   useEffect(() => {
@@ -425,6 +437,9 @@ export function SessionView({ shape, eraId, domain, threadId, onFinished, onCanc
             {shape === 'spaced' && <span className="text-ink-soft">Just due</span>}
             {shape === 'mistakes' && <span className="text-ink-soft">Struggling concepts</span>}
             {shape === 'daily' && <span className="text-ink-soft">Today</span>}
+            {shape === 'collection' && collectionName && (
+              <span className="text-ink-soft">{collectionName}</span>
+            )}
             <span className="ml-3">
               {index + 1} of {plan.items.length}
             </span>

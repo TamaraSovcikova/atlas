@@ -18,6 +18,8 @@ export interface Prefs {
   theme: Theme
   /** Show the due-review count on the installed app icon (Badging API). */
   dueBadge: boolean
+  /** Auto-read concept summaries aloud via Web Speech API. */
+  listenMode: boolean
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -32,6 +34,7 @@ export const DEFAULT_PREFS: Prefs = {
   streakFreezes: 2,
   theme: 'light',
   dueBadge: true,
+  listenMode: false,
 }
 
 export const MAX_STREAK_FREEZES = 5

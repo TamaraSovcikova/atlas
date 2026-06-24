@@ -1,17 +1,20 @@
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Review } from '../db/schema'
+import { db, type Review, type Era, type Session } from '../db/schema'
 import { dayStats, dayIndex, metDays, progressSnapshot } from '../lib/progress'
 import { masteryOf, masterySpread, MASTERY_META, MASTERY_ORDER } from '../lib/mastery'
 import { useSettings } from '../store/useSettings'
+import { summariseEras, type EraSummary } from '../lib/session'
 
 const WEEKS = 14
 
 export function StatsView() {
   const prefs = useSettings((s) => s.prefs)
-  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
+  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [] as Session[])
   const concepts = useLiveQuery(() => db.concepts.toArray(), [], [])
   const reviews = useLiveQuery(() => db.reviews.toArray(), [], [] as Review[])
+  const eras = useLiveQuery(() => db.eras.orderBy('displayOrder').toArray(), [], [] as Era[])
+  const eraSummaries = useLiveQuery(() => summariseEras(), [concepts, reviews], new Map<string, EraSummary>())
 
   const snapshot = useMemo(
     () => progressSnapshot(sessions, prefs.dailyGoalCards, prefs.streakFreezes),
@@ -107,8 +110,8 @@ export function StatsView() {
                       backgroundColor: future
                         ? 'transparent'
                         : intensity === 0
-                          ? 'rgba(255,255,255,0.05)'
-                          : `rgba(251,191,36,${0.25 + intensity * 0.6})`,
+                          ? 'rgb(var(--ink) / 0.06)'
+                          : `rgb(var(--accent) / ${0.25 + intensity * 0.6})`,
                     }}
                   />
                 )
@@ -207,6 +210,43 @@ export function StatsView() {
           })}
         </ul>
       </div>
+
+      {/* Era mastery */}
+      {eras.length > 0 && (() => {
+        const eraRows = eras
+          .map((era) => ({ era, s: eraSummaries.get(era.id) }))
+          .filter((r) => r.s && r.s.total > 0)
+        if (eraRows.length === 0) return null
+        return (
+          <div className="surface p-5">
+            <h3 className="font-serif text-lg text-ink">Eras you know</h3>
+            <p className="mt-1 text-[11px] text-ink-softer">
+              How much of each historical period you have met
+            </p>
+            <ul className="mt-4 space-y-3">
+              {eraRows.map(({ era, s }) => {
+                const pct = s!.total === 0 ? 0 : Math.round((s!.met / s!.total) * 100)
+                return (
+                  <li key={era.id}>
+                    <div className="flex items-baseline justify-between gap-2 text-xs">
+                      <span className="truncate text-ink-soft">{era.name}</span>
+                      <span className="shrink-0 tabular-nums text-ink-softer">
+                        {s!.met}/{s!.total}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg-softer">
+                      <div
+                        className="h-full rounded-full bg-accent/70 transition-all duration-700"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )
+      })()}
     </section>
   )
 }

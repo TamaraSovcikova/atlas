@@ -190,6 +190,12 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           value={prefs.dueBadge}
           onChange={(v) => update({ dueBadge: v })}
         />
+        <Toggle
+          label="Listen mode"
+          desc="Auto-read concept briefs aloud using your device's voice. Good for hands-free sessions."
+          value={prefs.listenMode}
+          onChange={(v) => update({ listenMode: v })}
+        />
         {canInstall && (
           <button
             type="button"
