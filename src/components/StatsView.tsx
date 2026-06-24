@@ -21,6 +21,23 @@ export function StatsView() {
   const stats = useMemo(() => dayStats(sessions), [sessions])
   const met = useMemo(() => metDays(stats, prefs.dailyGoalCards), [stats, prefs.dailyGoalCards])
 
+  // Due forecast: scheduled reviews for already-met concepts over the next 14 days.
+  const FORECAST_DAYS = 14
+  const forecast = useMemo(() => {
+    const today = dayIndex(Date.now())
+    const metIds = new Set(concepts.filter((c) => c.firstSeenAt !== null).map((c) => c.id))
+    const buckets = new Array(FORECAST_DAYS).fill(0)
+    let overdue = 0
+    for (const r of reviews) {
+      if (!metIds.has(r.conceptId)) continue
+      const d = dayIndex(r.dueAt)
+      if (d <= today) overdue++
+      else if (d - today < FORECAST_DAYS) buckets[d - today]++
+    }
+    const peak = Math.max(1, overdue, ...buckets)
+    return { overdue, buckets, peak }
+  }, [reviews, concepts])
+
   const spread = useMemo(() => {
     const byConcept = new Map(reviews.map((r) => [r.conceptId, r]))
     const levels = concepts.map((c) => masteryOf(byConcept.get(c.id), c.firstSeenAt !== null))
@@ -99,6 +116,43 @@ export function StatsView() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Due forecast */}
+      <div className="surface p-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="font-serif text-lg text-ink">Coming due</h3>
+          {forecast.overdue > 0 && (
+            <span className="text-sm text-accent">{forecast.overdue} due now</span>
+          )}
+        </div>
+        {forecast.buckets.every((b) => b === 0) && forecast.overdue === 0 ? (
+          <p className="mt-2 text-sm text-ink-soft">
+            Nothing scheduled yet. As you learn, reviews will start landing here.
+          </p>
+        ) : (
+          <>
+            <div className="mt-4 flex h-24 items-end gap-1">
+              {forecast.buckets.map((count, i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                  <div className="flex w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-t bg-accent/70"
+                      style={{ height: `${count === 0 ? 0 : Math.max(6, (count / forecast.peak) * 100)}%` }}
+                      title={`${count} due`}
+                    />
+                  </div>
+                  <span className="text-[9px] tabular-nums text-ink-softer">
+                    {i === 0 ? 'today' : i % 2 === 0 ? `+${i}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-ink-softer">
+              Reviews scheduled over the next {FORECAST_DAYS} days. Keeping up with the daily session keeps this even.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Retention */}
