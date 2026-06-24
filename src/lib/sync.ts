@@ -1,18 +1,24 @@
 import { db } from '../db/schema'
-import { exportBackup, importBackup, type ImportResult } from './backup'
+import { exportBackup, importBackup, mergeBackup, type ImportResult, type AtlasBackup } from './backup'
 
 /**
- * Cloud sync over the atlas-sync Worker (bearer-token-as-account). The token is
- * the only credential: no login, no email. It lives in a settings row so it
- * survives reloads and rides along in local backups, letting a second device
- * adopt the same account by importing a backup or pasting the token.
+ * Cloud sync over the atlas-sync Worker. Two auth modes:
  *
- * Worker: worker/src/index.ts  (GET/PUT /sync, Bearer auth).
+ * 1. Anonymous (default): the bearer token IS the account — whoever holds the
+ *    token owns that row. Self-minted, stored in settings, shared via backup.
+ * 2. Signed-in (Wave 3): a Google OAuth session token keyed by user_id in D1,
+ *    so the same Google account on any device syncs the same data without
+ *    copying a token.
+ *
+ * Merge strategy (Wave 3): on pull, the smart mergeBackup() function is used
+ * instead of a wholesale replace, so two devices used in parallel converge
+ * without clobbering either side's progress.
  */
 
 export const SYNC_URL = 'https://atlas-sync.tamara-sovcik.workers.dev'
 
 const TOKEN_KEY = 'syncToken'
+const SESSION_KEY = 'accountSession' // set by auth.ts after Google sign-in
 const LAST_KEY = 'lastSyncedAt'
 
 export async function getSyncToken(): Promise<string | null> {
@@ -48,14 +54,32 @@ async function markSynced(now = Date.now()): Promise<void> {
   await db.settings.put({ key: LAST_KEY, value: now })
 }
 
+/**
+ * Returns the best available auth header value.
+ * - If a Google session is stored, use it (keyed by user_id on server).
+ * - Otherwise fall back to the anonymous bearer token.
+ */
+async function getBestToken(): Promise<string | null> {
+  const sessionRow = await db.settings.get(SESSION_KEY)
+  const session = sessionRow?.value as string | undefined
+  if (session) return session
+  return getSyncToken()
+}
+
 export interface SyncResult {
   ok: boolean
   message: string
 }
 
-/** Push the full local backup to the cloud under the current token. */
+/** Push the full local backup to the cloud. */
 export async function pushToCloud(): Promise<SyncResult> {
-  const token = await ensureSyncToken()
+  // Anonymous path: ensure a token exists. Signed-in path: session already present.
+  const session = (await db.settings.get(SESSION_KEY))?.value as string | undefined
+  if (!session) await ensureSyncToken()
+
+  const token = await getBestToken()
+  if (!token) return { ok: false, message: 'No sync token or session on this device.' }
+
   const backup = await exportBackup()
   try {
     const res = await fetch(`${SYNC_URL}/sync`, {
@@ -74,9 +98,41 @@ export async function pushToCloud(): Promise<SyncResult> {
   }
 }
 
-/** Pull the cloud backup for the current token and replace local data. */
+/**
+ * Pull the cloud backup and merge it into local state (Wave 3: smart merge,
+ * not wholesale replace). The merge takes the best of each record so neither
+ * device loses progress.
+ */
 export async function pullFromCloud(): Promise<SyncResult & { imported?: ImportResult }> {
-  const token = await getSyncToken()
+  const token = await getBestToken()
+  if (!token) return { ok: false, message: 'No sync token or session on this device yet.' }
+  try {
+    const res = await fetch(`${SYNC_URL}/sync`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.status === 404) return { ok: false, message: 'Nothing in the cloud for this token yet.' }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }))
+      return { ok: false, message: `Pull failed: ${(err as { error?: string }).error ?? res.status}` }
+    }
+    const body = (await res.json()) as { payload: unknown }
+    const remote = body.payload as AtlasBackup
+    const imported = await mergeBackup(remote)
+    if (!imported.ok) return { ok: false, message: imported.message, imported }
+    await markSynced()
+    return { ok: true, message: 'Merged from the cloud.', imported }
+  } catch (e) {
+    return { ok: false, message: `Pull failed: ${(e as Error).message}` }
+  }
+}
+
+/**
+ * Full replace import (used by the file-import path in SettingsView).
+ * When the user explicitly imports a file they want an exact restore, not a
+ * merge. pullFromCloud uses mergeBackup; this uses importBackup.
+ */
+export async function replaceFromCloud(): Promise<SyncResult & { imported?: ImportResult }> {
+  const token = await getBestToken()
   if (!token) return { ok: false, message: 'No sync token on this device yet.' }
   try {
     const res = await fetch(`${SYNC_URL}/sync`, {

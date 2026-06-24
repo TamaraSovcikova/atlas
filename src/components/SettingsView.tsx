@@ -17,6 +17,14 @@ import {
   pushToCloud,
   pullFromCloud,
 } from '../lib/sync'
+import {
+  fetchUser,
+  signInWithGoogle,
+  signOut as googleSignOut,
+  getCachedUser,
+  claimAnonymousBackup,
+  type AtlasUser,
+} from '../lib/auth'
 
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 const THEMES: { key: Theme; label: string }[] = [
@@ -41,9 +49,17 @@ export function SettingsView({ canInstall, onInstall }: Props) {
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Account state (Wave 3)
+  const [user, setUser] = useState<AtlasUser | null>(null)
+  const [accountMsg, setAccountMsg] = useState<string | null>(null)
+  const [accountBusy, setAccountBusy] = useState(false)
+
   useEffect(() => {
     getSyncToken().then((t) => setToken(t ?? ''))
     getLastSyncedAt().then(setLastSynced)
+    getCachedUser().then(setUser)
+    // Revalidate in background
+    fetchUser().then((u) => { if (u) setUser(u) })
   }, [])
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -92,6 +108,38 @@ export function SettingsView({ canInstall, onInstall }: Props) {
     await setSyncToken(t)
     setToken(t)
     setSyncMsg('New token generated. Push to start a fresh cloud backup.')
+  }
+
+  async function onSignIn() {
+    setAccountBusy(true)
+    setAccountMsg(null)
+    try {
+      const anonToken = await getSyncToken()
+      const u = await signInWithGoogle()
+      setUser(u)
+      if (anonToken) {
+        const claimed = await claimAnonymousBackup(anonToken)
+        setAccountMsg(
+          claimed
+            ? `Signed in as ${u.email}. Your progress was merged into your account.`
+            : `Signed in as ${u.email}.`,
+        )
+      } else {
+        setAccountMsg(`Signed in as ${u.email}.`)
+      }
+    } catch (e) {
+      setAccountMsg((e as Error).message)
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
+  async function onSignOut() {
+    setAccountBusy(true)
+    await googleSignOut()
+    setUser(null)
+    setAccountMsg('Signed out.')
+    setAccountBusy(false)
   }
 
   return (
@@ -308,6 +356,51 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           className="hidden"
         />
         {backupMsg && <p className="text-xs text-accent">{backupMsg}</p>}
+      </div>
+
+      {/* Account (Wave 3) */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Account</h3>
+        {user ? (
+          <div className="rounded-2xl border border-bg-softer/40 bg-bg-soft/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{user.email}</p>
+                <p className="text-xs text-ink-softer capitalize">{user.planTier} plan</p>
+              </div>
+              <button
+                type="button"
+                disabled={accountBusy}
+                onClick={onSignOut}
+                className="shrink-0 rounded-xl border border-bg-softer/40 px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-accent/40 disabled:opacity-50"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-ink-softer">
+              Optional. Sign in with Google to sync your progress across devices without copying a token.
+              The app works fully without an account.
+            </p>
+            <button
+              type="button"
+              disabled={accountBusy}
+              onClick={onSignIn}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-bg-softer/40 bg-bg-soft/50 py-3 text-sm text-ink transition-colors hover:border-accent/40 disabled:opacity-50"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              {accountBusy ? 'Opening…' : 'Sign in with Google'}
+            </button>
+          </div>
+        )}
+        {accountMsg && <p className="text-xs text-accent">{accountMsg}</p>}
       </div>
 
       <div className="space-y-3">

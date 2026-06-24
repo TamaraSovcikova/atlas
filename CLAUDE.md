@@ -17,7 +17,7 @@ General-knowledge PWA built on FSRS-6 spaced repetition. Ten minutes a day, loca
 ```
 src/
   components/     React UI (DailySession, SessionView, RecallCard, SwipeRatingZone, cards/)
-  db/             schema.ts (Dexie v3), seed.ts
+  db/             schema.ts (Dexie v4), seed.ts
   lib/            fsrs.ts, session.ts, connections.ts
   content/        bank/*.ts, threads.ts, index.ts -- shared knowledge bank
 public/
@@ -40,7 +40,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 ## Current state
 
-2026-06-24: main=`2caad1f`. Wave 0+1 complete + full paper theme polish. Wave 0: editorial/paper identity (paper #F6F2EA / ink #221D16 / deep-blue #28486B); CSS-var shadows per theme; 3-tab IA Feed/Atlas/You; SegmentControl sub-panel routing (Atlas->Pathway|Browse; You->Progress|Settings); serif Fraunces header. Wave 1: StoryBrief.tsx (3-beat tap-through overlay Hook/Story/Connection before session start, db.edges for graph neighbours, Web Speech API audio at rate 0.92); feed story preview card in HomeView (getNextPathwayConcept, honours tier-gate); all border-white/* hardcodes replaced with border-ink/* across all components -- paper theme fully coherent. 38 tests. Full 2.0 plan in `~/workspace/Projects/Atlas/docs/ATLAS_2.0.md`. NEXT: Wave 2 -- Collections surface, mood/energy session entry, "You" identity. Deferred: heatmap + constellation colour tuning (still use rgba hardcodes).
+2026-06-24: main=`3daf287`. Wave 2 complete (deploy19 a33ab1b6). Collections: Collection+CollectionConcept tables (Dexie v4), buildCollectionSession, CollectionsView (create/delete/study), Atlas SegmentControl 3 panels (Pathway|Browse|Collections), ConceptRabbitHole Save/Saved picker. Listen mode: listenMode pref, HomeView toggle, StoryBrief auto-plays beats, SettingsView Toggle. Era mastery: StatsView "Eras you know" section (summariseEras, progress bars per era). Heatmap theme fix: rgb(var(--ink)/0.06) empty, rgb(var(--accent)/N) filled -- correct in paper+dark. 38 tests. Full 2.0 plan in `~/workspace/Projects/Atlas/docs/ATLAS_2.0.md`. NEXT: Wave 3 (optional Google OAuth + updatedAt-aware multi-device merge via Cloudflare Worker D1) or Wave 4 (AI layer).
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 
