@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { db, type Concept, type Collection } from '../db/schema'
+import { generateConcept } from '../lib/ai'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 
 interface ThreadResult {
@@ -19,6 +20,8 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
   const [collections, setCollections] = useState<Collection[]>([])
   const [threads, setThreads] = useState<ThreadResult[]>([])
   const [rabbitHoleId, setRabbitHoleId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -31,6 +34,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
       setConcepts([])
       setCollections([])
       setThreads([])
+      setGenError(null)
       return
     }
     let cancelled = false
@@ -56,6 +60,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
       setConcepts(cs)
       setCollections(cols)
       setThreads(ts)
+      setGenError(null)
     }
 
     const timer = setTimeout(search, 150)
@@ -64,6 +69,35 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
       clearTimeout(timer)
     }
   }, [query])
+
+  async function handleGenerate() {
+    const q = query.trim()
+    if (!q || generating) return
+    setGenerating(true)
+    setGenError(null)
+
+    const res = await generateConcept(q)
+    setGenerating(false)
+
+    if (!res.ok) {
+      setGenError(res.error)
+      return
+    }
+
+    // Save the AI-generated concept to the local DB so it shows in search results
+    // and can be studied later. Mark as AI-generated via the id prefix.
+    const now = Date.now()
+    const concept: Concept = {
+      ...res.concept,
+      domain: res.concept.domain as Concept['domain'],
+      lessonId: null,
+      firstSeenAt: null,
+      lastReviewedAt: null,
+      createdAt: now,
+    }
+    await db.concepts.put(concept)
+    setRabbitHoleId(concept.id)
+  }
 
   const hasResults = concepts.length > 0 || collections.length > 0 || threads.length > 0
   const q = query.trim()
@@ -90,6 +124,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !hasResults && q.length >= 2) handleGenerate() }}
             placeholder="Search concepts, stories, collections…"
             className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-softer"
           />
@@ -109,9 +144,38 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
               Type at least 2 characters to search
             </p>
           ) : !hasResults ? (
-            <p className="mt-8 text-center text-sm text-ink-softer">
-              No results for &ldquo;{q}&rdquo;
-            </p>
+            <div className="mt-8 flex flex-col items-center gap-4 text-center">
+              <p className="text-sm text-ink-softer">
+                Nothing in the vault for &ldquo;{q}&rdquo;
+              </p>
+              <button
+                type="button"
+                disabled={generating}
+                onClick={handleGenerate}
+                className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/8 px-5 py-3 text-sm font-medium text-accent hover:bg-accent/15 disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <span className="animate-pulse">Generating…</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                    Generate card with AI
+                  </>
+                )}
+              </button>
+              {genError && (
+                <p className="max-w-xs rounded-xl bg-bg-softer px-3 py-2 text-xs text-ink-soft">
+                  {genError}
+                </p>
+              )}
+              <p className="max-w-xs text-[11px] text-ink-softer/60">
+                AI · online only. The concept is saved to your vault for future study.
+              </p>
+            </div>
           ) : (
             <div className="space-y-6">
               {concepts.length > 0 && (
@@ -134,6 +198,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
                             <span className="block truncate text-[11px] text-ink-softer capitalize">
                               {c.domain.replace('_', ' ')}
                               {c.firstSeenAt ? ' · met' : ''}
+                              {c.id.startsWith('ai:') ? ' · AI-generated' : ''}
                             </span>
                           </span>
                           <svg

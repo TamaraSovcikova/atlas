@@ -176,6 +176,84 @@ In 2-3 sentences: why is the correct answer right, and what was tricky about thi
 }
 
 /**
+ * Generate a concept card for a query not found in the vault.
+ * Returns structured concept data parsed from the AI JSON reply.
+ * Degrades gracefully when the AI endpoint isn't configured.
+ */
+export async function generateConcept(query: string): Promise<
+  | {
+      ok: true
+      concept: {
+        id: string
+        name: string
+        domain: string
+        summary: string
+        approxYear: number | null
+        eras: string[]
+        threads: string[]
+        lat: number | null
+        lng: number | null
+        wikipediaUrl: string | null
+        imageUrl: null
+      }
+    }
+  | { ok: false; error: string }
+> {
+  const system = `You are Atlas, a structured knowledge database for a history learning app.
+Return ONLY valid JSON — no markdown fences, no prose, nothing else outside the JSON object.`
+  const prompt = `Query: "${query}"
+
+Return a single JSON object for the closest matching historical/world-knowledge concept:
+{
+  "name": "canonical English name",
+  "domain": "one of: history|geography|politics|religions|culture|science|modern_world",
+  "summary": "2-3 sentence encyclopedic summary",
+  "approxYear": year as integer or null,
+  "lat": decimal latitude or null,
+  "lng": decimal longitude or null,
+  "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null
+}`
+
+  const res = await callAI(prompt, system)
+  if (!res.ok) return res
+
+  try {
+    // Strip any accidental markdown fences the model may add
+    const cleaned = res.reply.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '')
+    const parsed = JSON.parse(cleaned) as {
+      name?: string
+      domain?: string
+      summary?: string
+      approxYear?: number | null
+      lat?: number | null
+      lng?: number | null
+      wikipediaUrl?: string | null
+    }
+    const VALID_DOMAINS = ['history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world']
+    const name = parsed.name ?? query
+    const id = `ai:${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}_${Date.now()}`
+    return {
+      ok: true,
+      concept: {
+        id,
+        name,
+        domain: VALID_DOMAINS.includes(parsed.domain ?? '') ? (parsed.domain as string) : 'history',
+        summary: parsed.summary ?? '',
+        approxYear: typeof parsed.approxYear === 'number' ? parsed.approxYear : null,
+        eras: [],
+        threads: [],
+        lat: typeof parsed.lat === 'number' ? parsed.lat : null,
+        lng: typeof parsed.lng === 'number' ? parsed.lng : null,
+        wikipediaUrl: typeof parsed.wikipediaUrl === 'string' ? parsed.wikipediaUrl : null,
+        imageUrl: null,
+      },
+    }
+  } catch {
+    return { ok: false, error: 'Could not parse AI response. Try a different search.' }
+  }
+}
+
+/**
  * Generate a "did you know" connection between two concepts the user knows.
  */
 export async function generateDidYouKnow(

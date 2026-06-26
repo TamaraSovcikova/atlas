@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMotionValue, useTransform } from 'motion/react'
 import type { Concept, RelationType } from '../db/schema'
+import { db } from '../db/schema'
 import type { FeedItem } from '../lib/feed'
 import type { RecallItem } from '../lib/session'
 import { buildRecallItemFor } from '../lib/session'
@@ -8,7 +9,7 @@ import type { RecallRating } from '../lib/fsrs'
 import { recordRating, recordFeedCard } from '../lib/grade'
 import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
-import { SwipeRatingZone } from './SwipeRatingZone'
+import { LinkedText } from './LinkedText'
 import { Button } from './ui/Button'
 import { M } from './ui/motion'
 
@@ -43,7 +44,7 @@ interface FeedCardProps {
   onInterest: (direction: SwipeInterest) => void
   /** A learning card was graded — pass rating + whether it was a first-seen concept. */
   onGraded: (rating: RecallRating, isNew: boolean) => void
-  /** Move to the next feed item (after a grade or a "skip"). */
+  /** Move to the next feed item (after a grade). */
   onAdvance: () => void
   /** Open the deeper story brief / rabbit hole for a concept. */
   onOpenConcept: (concept: Concept, threadName: string | null) => void
@@ -69,7 +70,6 @@ function InterestSwipe({
   const x = useMotionValue(0)
   const moreOpacity = useTransform(x, [-INTEREST_THRESHOLD, -20], [1, 0])
   const lessOpacity = useTransform(x, [20, INTEREST_THRESHOLD], [0, 1])
-  const dragDist = useRef(0)
 
   return (
     <div className="relative">
@@ -86,18 +86,13 @@ function InterestSwipe({
       >
         → Less like this
       </M.div>
+      {/* touch-action: pan-y tells the browser to own vertical scroll but
+          hand horizontal touch to JS — required inside a scroll-snap container */}
       <M.div
-        style={{ x }}
+        style={{ x, touchAction: 'pan-y' }}
         drag="x"
-        dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.5}
-        onDragStart={() => {
-          dragDist.current = 0
-        }}
-        onDrag={(_, info) => {
-          dragDist.current = Math.abs(info.offset.x)
-        }}
         onDragEnd={(_, info) => {
           if (info.offset.x <= -INTEREST_THRESHOLD) onCommit('left')
           else if (info.offset.x >= INTEREST_THRESHOLD) onCommit('right')
@@ -114,7 +109,6 @@ function InterestSwipe({
 function ConnectionCard({
   item,
   onInterest,
-  onAdvance,
   onOpenConcept,
 }: FeedCardProps & { item: Extract<FeedItem, { kind: 'connection' }> }) {
   const yearDiff =
@@ -124,22 +118,23 @@ function ConnectionCard({
   return (
     <CardFrame label="A connection in your constellation">
       <InterestSwipe onCommit={onInterest}>
-        <button
-          type="button"
-          onClick={() => onOpenConcept(item.from, null)}
-          className="block w-full text-left"
-        >
-          <p className="font-serif text-2xl leading-snug text-ink">
-            <span className="text-accent">{item.from.name}</span>{' '}
-            <span className="text-ink-soft">{RELATION_PHRASE[item.relation]}</span>{' '}
-            <span className="text-accent">{item.to.name}</span>
-          </p>
-          {yearDiff !== null && yearDiff > 5 && (
-            <p className="mt-3 text-sm text-ink-softer">{yearDiff} years apart</p>
-          )}
-        </button>
+        <div>
+          <button
+            type="button"
+            onClick={() => onOpenConcept(item.from, null)}
+            className="block w-full text-left"
+          >
+            <p className="font-serif text-2xl leading-snug text-ink">
+              <span className="text-accent">{item.from.name}</span>{' '}
+              <span className="text-ink-soft">{RELATION_PHRASE[item.relation]}</span>{' '}
+              <span className="text-accent">{item.to.name}</span>
+            </p>
+            {yearDiff !== null && yearDiff > 5 && (
+              <p className="mt-3 text-sm text-ink-softer">{yearDiff} years apart</p>
+            )}
+          </button>
+        </div>
       </InterestSwipe>
-      <SkipHint onAdvance={onAdvance} />
     </CardFrame>
   )
 }
@@ -163,6 +158,13 @@ function LearningCard({
   const [revealed, setRevealed] = useState<RecallRating | null | undefined>(undefined)
   const [grading, setGrading] = useState(false)
 
+  // Navigate to any concept by id — not just the current one
+  async function openConceptById(id: string) {
+    if (id === concept.id) { onOpenConcept(concept, null); return }
+    const c = await db.concepts.get(id)
+    if (c) onOpenConcept(c, null)
+  }
+
   // Build the recall item lazily when we enter the recall phase.
   useEffect(() => {
     if (phase !== 'recall' || recall) return
@@ -170,9 +172,7 @@ function LearningCard({
     buildRecallItemFor(concept.id, prefs).then((it) => {
       if (!cancelled) setRecall(it)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [phase, recall, concept.id, prefs])
 
   async function handleRate(rating: RecallRating) {
@@ -189,25 +189,16 @@ function LearningCard({
     return (
       <CardFrame label={isNew ? 'New · tap to read the story' : 'From your map'}>
         <InterestSwipe onCommit={onInterest}>
-          <button
-            type="button"
-            onClick={() => onOpenConcept(concept, null)}
-            className="block w-full text-left"
-          >
-            <BriefBody concept={concept} />
-          </button>
+          <BriefBody
+            concept={concept}
+            onConceptClick={openConceptById}
+            onOpenSelf={() => onOpenConcept(concept, null)}
+          />
         </InterestSwipe>
-        <div className="mt-5 flex items-center gap-3">
-          <Button onClick={() => setPhase('recall')} className="flex-1">
+        <div className="mt-5">
+          <Button onClick={() => setPhase('recall')} className="w-full">
             Recall it
           </Button>
-          <button
-            type="button"
-            onClick={onAdvance}
-            className="rounded-xl px-4 py-2.5 text-sm text-ink-softer transition-colors hover:text-ink-soft"
-          >
-            Skip
-          </button>
         </div>
       </CardFrame>
     )
@@ -224,13 +215,18 @@ function LearningCard({
             item={recall}
             onAnswered={() => {}}
             onRevealed={(r) => setRevealed(r)}
-            onConceptClick={(id) => {
-              if (id === concept.id) onOpenConcept(concept, null)
-            }}
+            onConceptClick={openConceptById}
           />
           {revealed !== undefined && (
             <div className="mt-4 border-t border-ink/[0.07] pt-4">
-              <SwipeRatingZone onRate={handleRate} suggestedRating={revealed} />
+              <button
+                type="button"
+                disabled={grading}
+                onClick={() => handleRate(revealed ?? 'good')}
+                className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-medium text-on-accent hover:bg-accent-soft disabled:opacity-60"
+              >
+                Continue
+              </button>
             </div>
           )}
         </>
@@ -260,16 +256,60 @@ function CardFrame({
           <p className="text-[10px] font-medium uppercase tracking-widest text-ink-softer">{label}</p>
         </div>
         <div className="surface p-6">{children}</div>
+        {/* Swipe-up cue */}
+        <div className="mt-5 flex justify-center">
+          <svg
+            className="animate-bounce text-ink-softer/40"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
       </div>
     </div>
   )
 }
 
-function BriefBody({ concept }: { concept: Concept }) {
+function BriefBody({
+  concept,
+  onConceptClick,
+  onOpenSelf,
+}: {
+  concept: Concept
+  onConceptClick: (id: string) => void
+  onOpenSelf: () => void
+}) {
+  const [imgLoaded, setImgLoaded] = useState(false)
   return (
-    <>
-      <h3 className="font-serif text-2xl text-ink">{concept.name}</h3>
-      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{concept.summary}</p>
+    <div>
+      {/* Title tap opens the full story brief */}
+      <button type="button" onClick={onOpenSelf} className="block w-full text-left">
+        <h3 className="font-serif text-2xl text-ink">{concept.name}</h3>
+      </button>
+      {concept.imageUrl && (
+        <div className="mt-3 overflow-hidden rounded-xl">
+          <img
+            src={concept.imageUrl}
+            alt={concept.name}
+            className="h-44 w-full object-cover transition-opacity duration-500"
+            style={{ opacity: imgLoaded ? 1 : 0 }}
+            onLoad={() => setImgLoaded(true)}
+            onError={(e) => {
+              const el = e.currentTarget.parentElement
+              if (el) el.style.display = 'none'
+            }}
+          />
+        </div>
+      )}
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">
+        <LinkedText text={concept.summary} onConceptClick={onConceptClick} />
+      </p>
       {concept.wikipediaUrl && (
         <span className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-accent/70">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -278,21 +318,6 @@ function BriefBody({ concept }: { concept: Concept }) {
           Read more
         </span>
       )}
-    </>
-  )
-}
-
-function SkipHint({ onAdvance }: { onAdvance: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onAdvance}
-      className="mt-6 flex w-full items-center justify-center gap-1.5 text-xs text-ink-softer transition-colors hover:text-ink-soft"
-    >
-      <span>Swipe up for next</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="m18 15-6-6-6 6" />
-      </svg>
-    </button>
+    </div>
   )
 }

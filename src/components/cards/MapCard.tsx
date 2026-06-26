@@ -63,21 +63,74 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
+interface MapSVGProps {
+  paths: string[]
+  tap: { lng: number; lat: number } | null
+  targetLat: number
+  targetLng: number
+  correct: boolean
+  distance: number | null
+  onTap: (lng: number, lat: number) => void
+  className?: string
+}
+
+function MapSVG({ paths, tap, targetLat, targetLng, correct, distance: _distance, onTap, className }: MapSVGProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const targetXY = { x: targetLng + 180, y: 90 - targetLat }
+  const tapXY = tap ? { x: tap.lng + 180, y: 90 - tap.lat } : null
+
+  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
+    if (tap || !svgRef.current) return
+    const rect = svgRef.current.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * W
+    const y = ((e.clientY - rect.top) / rect.height) * H
+    onTap(x - 180, 90 - y)
+  }
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${W} ${H}`}
+      onClick={handleClick}
+      className={`cursor-crosshair touch-none select-none ${className ?? ''}`}
+      style={{ aspectRatio: '2 / 1' }}
+    >
+      {paths.map((d, i) => (
+        <path key={i} d={d} fill="#1e293b" stroke="#334155" strokeWidth={0.2} />
+      ))}
+      {tap && (
+        <>
+          <line
+            x1={tapXY!.x}
+            y1={tapXY!.y}
+            x2={targetXY.x}
+            y2={targetXY.y}
+            stroke={correct ? '#fbbf24' : '#f87171'}
+            strokeWidth={0.6}
+            strokeDasharray="2 2"
+          />
+          <circle cx={tapXY!.x} cy={tapXY!.y} r={2.5} fill="#f87171" />
+          <circle cx={targetXY.x} cy={targetXY.y} r={3} fill="#fbbf24" stroke="#0f172a" strokeWidth={0.6} />
+        </>
+      )}
+    </svg>
+  )
+}
+
 export function MapCard({ item, onAnswered, onRevealed }: Props) {
   const { concept } = item
-  const svgRef = useRef<SVGSVGElement>(null)
   const [paths, setPaths] = useState<string[]>([])
   const [tap, setTap] = useState<{ lng: number; lat: number } | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(() => {
     setTap(null)
+    setFullscreen(false)
     let cancelled = false
     loadWorld().then((f) => {
       if (!cancelled) setPaths(featurePaths(f))
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [item.cardKey])
 
   const targetLat = concept.lat ?? 0
@@ -85,22 +138,13 @@ export function MapCard({ item, onAnswered, onRevealed }: Props) {
   const distance = tap ? haversineKm(tap.lat, tap.lng, targetLat, targetLng) : null
   const correct = distance !== null && distance <= CORRECT_KM
 
-  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
-    if (tap || !svgRef.current) return
-    const rect = svgRef.current.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * W
-    const y = ((e.clientY - rect.top) / rect.height) * H
-    const lng = x - 180
-    const lat = 90 - y
+  function handleTap(lng: number, lat: number) {
+    if (tap) return
     const d = haversineKm(lat, lng, targetLat, targetLng)
-    const isCorrect = d <= CORRECT_KM
     setTap({ lng, lat })
     onAnswered(concept.id)
-    onRevealed(isCorrect ? 'good' : 'again')
+    onRevealed(d <= CORRECT_KM ? 'good' : 'again')
   }
-
-  const targetXY = { x: targetLng + 180, y: 90 - targetLat }
-  const tapXY = tap ? { x: tap.lng + 180, y: 90 - tap.lat } : null
 
   return (
     <article className="space-y-5">
@@ -110,33 +154,29 @@ export function MapCard({ item, onAnswered, onRevealed }: Props) {
         <p className="mt-1 text-sm text-ink-soft">Tap roughly where it is on the map.</p>
       </header>
 
-      <div className="overflow-hidden rounded-2xl border border-bg-softer/40 bg-bg-soft/40">
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${W} ${H}`}
-          onClick={handleClick}
-          className="w-full cursor-crosshair touch-none select-none"
-          style={{ aspectRatio: '2 / 1' }}
-        >
-          {paths.map((d, i) => (
-            <path key={i} d={d} fill="#1e293b" stroke="#334155" strokeWidth={0.2} />
-          ))}
-          {tap && (
-            <>
-              <line
-                x1={tapXY!.x}
-                y1={tapXY!.y}
-                x2={targetXY.x}
-                y2={targetXY.y}
-                stroke={correct ? '#fbbf24' : '#f87171'}
-                strokeWidth={0.6}
-                strokeDasharray="2 2"
-              />
-              <circle cx={tapXY!.x} cy={tapXY!.y} r={2.5} fill="#f87171" />
-              <circle cx={targetXY.x} cy={targetXY.y} r={3} fill="#fbbf24" stroke="#0f172a" strokeWidth={0.6} />
-            </>
-          )}
-        </svg>
+      <div className="relative overflow-hidden rounded-2xl border border-bg-softer/40 bg-bg-soft/40">
+        {!tap && (
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            className="absolute right-2 top-2 z-10 rounded-lg bg-bg/70 p-1.5 text-ink-softer backdrop-blur-sm hover:text-ink"
+            aria-label="Open fullscreen map"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </button>
+        )}
+        <MapSVG
+          paths={paths}
+          tap={tap}
+          targetLat={targetLat}
+          targetLng={targetLng}
+          correct={correct}
+          distance={distance}
+          onTap={handleTap}
+          className="w-full"
+        />
       </div>
 
       {tap && (
@@ -145,6 +185,42 @@ export function MapCard({ item, onAnswered, onRevealed }: Props) {
             ? 'Spot on.'
             : `About ${Math.round(distance!).toLocaleString()} km off. The pin shows the spot.`}
         </p>
+      )}
+
+      {/* Fullscreen modal */}
+      {fullscreen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#0d1117]">
+          <div className="flex shrink-0 items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-accent">Where in the world</p>
+              <p className="font-serif text-lg text-white">{concept.name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="rounded-xl border border-white/10 px-3 py-1.5 text-sm text-white/60 hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex flex-1 items-center">
+            <MapSVG
+              paths={paths}
+              tap={tap}
+              targetLat={targetLat}
+              targetLng={targetLng}
+              correct={correct}
+              distance={distance}
+              onTap={(lng, lat) => { handleTap(lng, lat); setFullscreen(false) }}
+              className="w-full"
+            />
+          </div>
+          {tap && (
+            <p className="shrink-0 px-4 pb-4 text-center text-sm text-white/60">
+              {correct ? 'Spot on.' : `About ${Math.round(distance!).toLocaleString()} km off.`}
+            </p>
+          )}
+        </div>
       )}
     </article>
   )

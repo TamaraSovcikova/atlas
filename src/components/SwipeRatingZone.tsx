@@ -44,7 +44,7 @@ export function SwipeRatingZone({ onRate, suggestedRating }: Props) {
 
   return (
     <M.div
-      style={{ x, rotate }}
+      style={{ x, rotate, touchAction: 'pan-y' }}
       drag="x"
       dragConstraints={{ left: -300, right: 300 }}
       dragElastic={0.06}
