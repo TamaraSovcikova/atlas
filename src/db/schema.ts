@@ -165,6 +165,25 @@ export interface SettingsKv {
   value: unknown
 }
 
+export type SwipeDirection = 'up' | 'left' | 'right'
+
+/**
+ * One recorded swipe in the infinite feed. Feeds the preference recommender and
+ * gives us a history for tuning / future undo. Interest *weights* live in the
+ * settings kv (small, syncs with the token); this table is the raw event log.
+ */
+export interface FeedEvent {
+  id?: number
+  /** The feed item's cardKey (e.g. 'concept:rome', 'review:caesar', 'conn:a-b'). */
+  itemKey: string
+  /** Primary topic touched, for quick aggregate queries. */
+  topicDomain: Domain | null
+  direction: SwipeDirection
+  /** Milliseconds the item was on screen before the swipe. */
+  dwellMs: number
+  at: number
+}
+
 export class AtlasDB extends Dexie {
   concepts!: Table<Concept, string>
   edges!: Table<Edge, number>
@@ -177,6 +196,7 @@ export class AtlasDB extends Dexie {
   threads!: Table<Thread, string>
   collections!: Table<Collection, string>
   collectionConcepts!: Table<CollectionConcept, number>
+  feedEvents!: Table<FeedEvent, number>
 
   constructor() {
     super('atlas')
@@ -235,6 +255,22 @@ export class AtlasDB extends Dexie {
       threads: 'id, displayOrder',
       collections: 'id, createdAt',
       collectionConcepts: '++id, collectionId, conceptId, [collectionId+conceptId]',
+    })
+    // v5 adds feedEvents (swipe history for the infinite feed recommender).
+    // Purely additive -- no existing data is touched.
+    this.version(5).stores({
+      concepts: 'id, name, domain, approxYear, lastReviewedAt, *eras, *threads',
+      edges: '++id, fromId, toId, [fromId+toId], isPersonal',
+      lessons: 'id, conceptId',
+      reviews: '++id, conceptId, dueAt, state',
+      sessions: '++id, startedAt',
+      news: 'id, date, region',
+      settings: 'key',
+      eras: 'id, displayOrder',
+      threads: 'id, displayOrder',
+      collections: 'id, createdAt',
+      collectionConcepts: '++id, collectionId, conceptId, [collectionId+conceptId]',
+      feedEvents: '++id, at',
     })
   }
 }

@@ -310,6 +310,24 @@ async function makeRecallItem(
   }
 }
 
+/**
+ * Build a single recall card for one concept, using the same format-selection
+ * logic as a full session. Used by the infinite feed to grade a due review (or a
+ * just-introduced concept) inline. Returns null if the concept lacks a lesson.
+ */
+export async function buildRecallItemFor(
+  conceptId: string,
+  prefs: Prefs,
+  rotationIndex = 0,
+): Promise<RecallItem | null> {
+  const concept = await db.concepts.get(conceptId)
+  if (!concept) return null
+  const review = await db.reviews.where('conceptId').equals(conceptId).first()
+  if (!review) return null
+  const policy = resolvePolicy(prefs)
+  return makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'feed', rotationIndex)
+}
+
 function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
   let items: SessionItem[] = interleave(recall)
   // Games only draw from concepts the user has already met. Asking someone to

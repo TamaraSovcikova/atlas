@@ -6,7 +6,8 @@ import { loadSeedIfNeeded } from './db/seed'
 import { useSettings } from './store/useSettings'
 import { MotionProvider } from './components/ui/motion'
 import { BottomNav, type Tab } from './components/BottomNav'
-import { HomeView } from './components/HomeView'
+import { FeedView } from './components/FeedView'
+import { Dashboard } from './components/Dashboard'
 import { StoryBrief } from './components/StoryBrief'
 import { BrowseView } from './components/BrowseView'
 import { PathwayView } from './components/PathwayView'
@@ -49,6 +50,7 @@ function App() {
   const [challengeOpen, setChallengeOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [moodPickerOpen, setMoodPickerOpen] = useState(false)
+  const [dashboardOpen, setDashboardOpen] = useState(false)
   const [storyBriefData, setStoryBriefData] = useState<{ concept: Concept; threadName: string } | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -227,6 +229,22 @@ function App() {
     )
   }
 
+  // Dashboard overlay — the feed's pull-down surface, full screen, no bottom nav
+  if (dashboardOpen) {
+    return (
+      <MotionProvider>
+        <main className="h-full">
+          <Dashboard
+            onStartFocus={() => { setDashboardOpen(false); setMoodPickerOpen(true) }}
+            onStartPractice={() => { setDashboardOpen(false); startSession({ shape: 'spaced' }, 'feed') }}
+            onNavigate={(t) => { setDashboardOpen(false); setTab(t) }}
+            onClose={() => setDashboardOpen(false)}
+          />
+        </main>
+      </MotionProvider>
+    )
+  }
+
   return (
     <MotionProvider>
       <div className="flex h-full flex-col">
@@ -260,18 +278,17 @@ function App() {
           </div>
         </header>
 
-        {/* Scrollable tab content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-2xl px-5 py-6">
-            {tab === 'feed' && (
-              <HomeView
-                onStartDaily={() => setMoodPickerOpen(true)}
-                onStartPractice={() => startSession({ shape: 'spaced' }, 'feed')}
-                onOpenConstellation={() => setConstellationOpen(true)}
-                onNavigate={setTab}
-                onOpenStoryBrief={(concept, threadName) => setStoryBriefData({ concept, threadName })}
-              />
-            )}
+        {/* Tab content — feed is full-bleed and owns its own vertical paging */}
+        <div className="flex-1 min-h-0">
+          {tab === 'feed' ? (
+            <FeedView
+              onOpenConcept={(concept, threadName) =>
+                setStoryBriefData({ concept, threadName: threadName ?? '' })
+              }
+              onOpenDashboard={() => setDashboardOpen(true)}
+            />
+          ) : (
+          <div className="h-full overflow-y-auto"><div className="mx-auto max-w-2xl px-5 py-6">
             {tab === 'atlas' && (
               <div className="space-y-5">
                 <SegmentControl
@@ -333,7 +350,8 @@ function App() {
                 )}
               </div>
             )}
-          </div>
+          </div></div>
+          )}
         </div>
 
         <BottomNav active={tab} onChange={setTab} />

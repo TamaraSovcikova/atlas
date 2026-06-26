@@ -14,7 +14,8 @@ import {
   completeSession,
 } from '../lib/dailyPlan'
 import { buildCollectionSession } from '../lib/session'
-import { applyRating, type RecallRating } from '../lib/fsrs'
+import { type RecallRating } from '../lib/fsrs'
+import { recordRating } from '../lib/grade'
 import { getSyncToken, pushToCloud } from '../lib/sync'
 import { db, type Domain, type Era } from '../db/schema'
 import { useSettings } from '../store/useSettings'
@@ -60,31 +61,6 @@ function sessionId(
   if (shape === 'domain') return domain
   if (shape === 'thread') return threadId
   return null
-}
-
-async function recordRating(conceptId: string, rating: RecallRating, now: number) {
-  const review = await db.reviews.where('conceptId').equals(conceptId).first()
-  if (!review) return
-  const next = applyRating(review, rating, now)
-  await db.reviews.update(review.id!, {
-    dueAt: next.dueAt,
-    stability: next.stability,
-    difficulty: next.difficulty,
-    elapsedDays: next.elapsedDays,
-    scheduledDays: next.scheduledDays,
-    reps: next.reps,
-    lapses: next.lapses,
-    state: next.state,
-    lastReviewedAt: next.lastReviewedAt,
-    failureStreak: next.failureStreak,
-  })
-  const concept = await db.concepts.get(conceptId)
-  if (concept) {
-    await db.concepts.update(conceptId, {
-      lastReviewedAt: now,
-      firstSeenAt: concept.firstSeenAt ?? now,
-    })
-  }
 }
 
 export function SessionView({ shape, eraId, domain, threadId, collectionId, onFinished, onCancel }: Props) {
