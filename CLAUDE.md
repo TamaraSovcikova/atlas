@@ -34,11 +34,13 @@ npm test               # Vitest (co-located *.test.ts)
 npm run type-check     # tsc --noEmit
 ```
 
-Deploy: see `~/.claude/skills/atlas-deploy/SKILL.md` (WSL + wrangler BOM-safe script pattern).
+Deploy: `source ~/.nvm/nvm.sh && npm run build && npx wrangler pages deploy dist --project-name atlas` (run inside WSL). The atlas-deploy skill was removed; use this directly.
 
 Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA service worker caches old build -- two loads to see a new deploy.
 
 ## Current state
+
+2026-07-08 (Chat #19): Bug fix -- new concept cards reappearing as "New" in later sessions. Root cause: two advancement paths existed for new (kind:'concept') cards but only one seeded FSRS. The "Got it" button called `recordRating` (setting `firstSeenAt`). An interest swipe or plain scroll-past advanced the card via `FeedView.handleInterest`/`handleCurrentChange` without ever calling `recordRating`, leaving `firstSeenAt = null`. Fix: `FeedView.handleCurrentChange` now auto-seeds any new concept card leaving the viewport without prior grading (tracked with a `gradedKeys` ref parallel to `swipedKeys`). 48 tests still green.
 
 2026-06-26 (Chat #18): TikTok-style feed is the home. `src/lib/feed.ts` recommender = InterestWeights in settings kv `feed:interest:v1`; swipe-left boosts a topic +queues graph neighbours (deepQueue), swipe-right decays, swipe-up = dwell; weights floored 0.25 / capped 3.0; ~25% exploration floor; due reviews interleaved (the Spine wins); diversity guard; pure functions unit-tested. `FeedView.tsx` = vertical scroll-snap pager, infinite append via IntersectionObserver, dwell tracking, pull-down-at-top -> Dashboard, in-feed listen-mode toggle. `Dashboard.tsx` = pull-down surface (today/streak, opt-in Focus session, pathway, collections). `grade.ts` = shared `recordRating` + `recordFeedCard` rolling daily-session accumulator (keeps the streak). Schema v5 adds `feedEvents`. 48 tests.
 
