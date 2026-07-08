@@ -8,6 +8,8 @@ import {
   type FeedItem,
   type FeedState,
 } from '../lib/feed'
+import { recordRating, recordFeedCard } from '../lib/grade'
+import { useSettings } from '../store/useSettings'
 import { FeedCard, type SwipeInterest } from './FeedCard'
 
 const INITIAL_BATCH = 6
@@ -19,6 +21,8 @@ interface Props {
 }
 
 export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
+  const prefs = useSettings((s) => s.prefs)
+  const updatePrefs = useSettings((s) => s.update)
   const [items, setItems] = useState<FeedItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
@@ -30,6 +34,9 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
   const dwellStartRef = useRef<number>(Date.now())
   const currentIndexRef = useRef(0)
   const swipedKeys = useRef<Set<string>>(new Set())
+  // Tracks new concept cards that have been graded via "Got it" (or auto-seeded on scroll-past),
+  // so handleCurrentChange doesn't double-seed when the card was already explicitly graded.
+  const gradedKeys = useRef<Set<string>>(new Set())
   const pullStartY = useRef<number | null>(null)
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -87,9 +94,19 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     const dwell = now - dwellStartRef.current
     dwellStartRef.current = now
 
+    const prev = items[prevIdx]
+
+    // Seed FSRS for new concept cards that left the screen without a "Got it" press.
+    // This covers two cases: interest-swipe (advance without grading) and plain scroll-past.
+    // Without this, firstSeenAt stays null and the card reappears as "New" next session.
+    if (prev && prev.kind === 'concept' && !gradedKeys.current.has(prev.key)) {
+      gradedKeys.current.add(prev.key)
+      recordRating(prev.concept.id, 'good', now).catch(() => {})
+      recordFeedCard('good', true, now).catch(() => {})
+    }
+
     // Implicit dwell signal for the item we just left (discovery cards only —
     // reviews are graded, not interest-rated).
-    const prev = items[prevIdx]
     if (prev && prev.kind !== 'review' && !swipedKeys.current.has(prev.key) && stateRef.current) {
       recordSwipe(prev, 'up', dwell, stateRef.current).then((s) => {
         stateRef.current = s
@@ -137,18 +154,45 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
 
   return (
     <div className="relative h-full">
-      {/* Dashboard affordance (also the click target for non-touch) */}
-      <button
-        type="button"
-        onClick={onOpenDashboard}
-        className="absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-ink/[0.08] bg-bg/80 px-3 py-1 text-[11px] text-ink-softer backdrop-blur-sm transition-colors hover:text-ink"
-        aria-label="Open dashboard"
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-        Today
-      </button>
+      {/* Top bar: dashboard affordance + listen toggle */}
+      <div className="absolute left-0 right-0 top-2 z-10 flex items-center justify-between px-3">
+        <button
+          type="button"
+          onClick={() => updatePrefs({ listenMode: !prefs.listenMode })}
+          className={`rounded-full border border-ink/[0.08] bg-bg/80 p-1.5 backdrop-blur-sm transition-colors ${
+            prefs.listenMode ? 'text-accent' : 'text-ink-softer hover:text-ink'
+          }`}
+          aria-label={prefs.listenMode ? 'Turn off listen mode' : 'Turn on listen mode'}
+        >
+          {prefs.listenMode ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenDashboard}
+          className="flex items-center gap-1 rounded-full border border-ink/[0.08] bg-bg/80 px-3 py-1 text-[11px] text-ink-softer backdrop-blur-sm transition-colors hover:text-ink"
+          aria-label="Open dashboard"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          Today
+        </button>
+
+        {/* Spacer to keep Today centred */}
+        <div className="w-8" />
+      </div>
 
       <div
         ref={containerRef}
@@ -171,6 +215,7 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
               active={i === currentIndex}
               onInterest={(dir) => handleInterest(i, item, dir)}
               onGraded={() => {
+                gradedKeys.current.add(item.key)
                 if (i >= items.length - 2) appendMore()
               }}
               onAdvance={() => advanceTo(i + 1)}

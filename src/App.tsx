@@ -188,25 +188,6 @@ function App() {
     )
   }
 
-  // Story Brief overlay — full screen, no bottom nav
-  if (storyBriefData) {
-    return (
-      <MotionProvider>
-        <main className="h-full">
-          <StoryBrief
-            concept={storyBriefData.concept}
-            threadName={storyBriefData.threadName}
-            onStart={() => {
-              setStoryBriefData(null)
-              startSession({ shape: 'daily' }, 'feed')
-            }}
-            onClose={() => setStoryBriefData(null)}
-          />
-        </main>
-      </MotionProvider>
-    )
-  }
-
   // Constellation overlay — full screen, no bottom nav
   if (constellationOpen) {
     return (
@@ -356,6 +337,19 @@ function App() {
 
         <BottomNav active={tab} onChange={setTab} />
       </div>
+
+      {/* Story Brief — the optional deep dive (tap a concept's title). Layered
+          OVER the feed so it stays mounted underneath; closing returns the user
+          to the exact card they left, with the interest-swipe still available. */}
+      {storyBriefData && (
+        <div className="fixed inset-0 z-50 bg-bg">
+          <StoryBrief
+            concept={storyBriefData.concept}
+            threadName={storyBriefData.threadName}
+            onClose={() => setStoryBriefData(null)}
+          />
+        </div>
+      )}
 
       {/* Search modal — layered on top of everything */}
       {searchOpen && (

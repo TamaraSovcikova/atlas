@@ -30,14 +30,21 @@ interface KnownNeighbour {
 interface Props {
   concept: Concept
   threadName: string
-  onStart: () => void
   onClose: () => void
 }
 
-const TOTAL_BEATS = 3
+// The optional deep dive, reached by tapping a concept's title. It is NOT part
+// of the core read/recall loop — it adds what a feed card can't fit: the fuller
+// story, the knowledge-web connections, and "ask the past". Two beats:
+//   0 — The story (richer read)
+//   1 — How it connects (web + ask the past)
+const TOTAL_BEATS = 2
 
-export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
-  const listenMode = useSettings((s) => s.prefs.listenMode)
+export function StoryBrief({ concept, threadName, onClose }: Props) {
+  const prefs = useSettings((s) => s.prefs)
+  const listenMode = prefs.listenMode
+  const speechRate = prefs.speechRate ?? 1.0
+
   const [beat, setBeat] = useState(0)
   const [neighbours, setNeighbours] = useState<KnownNeighbour[]>([])
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -48,7 +55,7 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
       const edges = await db.edges.where('fromId').equals(concept.id).toArray()
       const known: KnownNeighbour[] = []
       for (const e of edges) {
-        if (known.length >= 3) break
+        if (known.length >= 4) break
         const c = await db.concepts.get(e.toId)
         if (c && c.firstSeenAt !== null) {
           known.push({
@@ -65,21 +72,21 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
     }
   }, [concept.id])
 
-  // Auto-play each beat in listen mode. Depends on `beat` and `neighbours`
-  // (beat 2 text is built from neighbours, so we wait for them to load).
+  const hook = firstSentence(concept.summary)
+  const connectionSentence =
+    neighbours.length > 0
+      ? `${concept.name} connects to things you already know: ${neighbours.map((n) => n.name).join(', ')}.`
+      : `${concept.name} is a foundation concept — an anchor the rest of the story builds on.`
+
+  const beatText: string[] = [`${concept.name}. ${concept.summary}`, connectionSentence]
+
   useEffect(() => {
     if (!listenMode || !window.speechSynthesis) return
-    const text = [
-      `${concept.name}. ${firstSentence(concept.summary)}`,
-      concept.summary,
-      neighbours.length > 0
-        ? `${concept.name} connects to: ${neighbours.map((n) => n.name).join(', ')}.`
-        : `${concept.name} is a foundation concept.`,
-    ][beat]
+    const text = beatText[beat]
     if (!text) return
     window.speechSynthesis.cancel()
     const utt = new SpeechSynthesisUtterance(text)
-    utt.rate = 0.92
+    utt.rate = speechRate
     utt.onend = () => setSpeaking(false)
     utt.onerror = () => setSpeaking(false)
     setSpeaking(true)
@@ -87,21 +94,24 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
     return () => {
       window.speechSynthesis?.cancel()
     }
-  }, [listenMode, beat, neighbours, concept.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listenMode, speechRate, beat, neighbours, concept.id])
 
   function stopSpeech() {
     window.speechSynthesis?.cancel()
     setSpeaking(false)
   }
 
-  function toggleSpeech(text: string) {
+  function toggleSpeech() {
     if (!window.speechSynthesis) return
+    const text = beatText[beat]
+    if (!text) return
     if (speaking) {
       stopSpeech()
       return
     }
     const utt = new SpeechSynthesisUtterance(text)
-    utt.rate = 0.92
+    utt.rate = speechRate
     utt.onend = () => setSpeaking(false)
     utt.onerror = () => setSpeaking(false)
     setSpeaking(true)
@@ -121,15 +131,6 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
   const yearLabel = concept.approxYear
     ? `${Math.abs(concept.approxYear)} ${concept.approxYear < 0 ? 'BCE' : 'CE'}`
     : null
-  const hook = firstSentence(concept.summary)
-
-  const beatText = [
-    `${concept.name}. ${hook}`,
-    concept.summary,
-    neighbours.length > 0
-      ? `${concept.name} connects to things you already know: ${neighbours.map((n) => n.name).join(', ')}.`
-      : `${concept.name} is a foundation concept. This is where your knowledge of this story begins.`,
-  ]
 
   return (
     <div className="flex h-full flex-col bg-bg">
@@ -156,7 +157,7 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === beat ? 'w-6 bg-accent' : 'w-1.5 bg-ink/20 hover:bg-ink/40'
               }`}
-              aria-label={`Beat ${i + 1}`}
+              aria-label={`Step ${i + 1}`}
             />
           ))}
         </div>
@@ -164,7 +165,7 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
         {/* Audio toggle */}
         <button
           type="button"
-          onClick={() => toggleSpeech(beatText[beat] ?? '')}
+          onClick={toggleSpeech}
           className={`rounded-full p-1.5 transition-colors ${
             speaking ? 'text-accent' : 'text-ink-softer hover:text-ink'
           }`}
@@ -187,9 +188,9 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
       {/* Beat content — scrollable */}
       <div className="flex-1 overflow-y-auto px-6">
 
-        {/* Beat 1: The Hook */}
+        {/* Beat 0: The story */}
         {beat === 0 && (
-          <div className="space-y-6 py-6">
+          <div className="space-y-5 py-6">
             <p className="text-[11px] font-medium uppercase tracking-widest text-ink-softer">
               {domainLabel}{yearLabel ? ` · ${yearLabel}` : ''}
             </p>
@@ -197,21 +198,6 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
               {concept.name}
             </h2>
             <p className="text-lg leading-relaxed text-ink-soft">{hook}</p>
-            <p className="text-[11px] uppercase tracking-widest text-ink-softer/60">
-              From · {threadName}
-            </p>
-          </div>
-        )}
-
-        {/* Beat 2: Why it matters */}
-        {beat === 1 && (
-          <div className="space-y-5 py-6">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-widest text-ink-softer">
-                Why it matters · {threadName}
-              </p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold text-ink">{concept.name}</h2>
-            </div>
             {concept.imageUrl && (
               <div className="overflow-hidden rounded-2xl">
                 <img
@@ -227,25 +213,31 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
                 />
               </div>
             )}
-            <p className="text-base leading-relaxed text-ink-soft">{concept.summary}</p>
+            {concept.summary.length > hook.length && (
+              <p className="text-base leading-relaxed text-ink-soft">
+                {concept.summary.slice(hook.length).trim()}
+              </p>
+            )}
+            <p className="text-[11px] uppercase tracking-widest text-ink-softer/60">
+              From · {threadName}
+            </p>
           </div>
         )}
 
-        {/* Beat 3: The Connection */}
-        {beat === 2 && (
+        {/* Beat 1: How it connects */}
+        {beat === 1 && (
           <div className="space-y-5 py-6">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-widest text-ink-softer">
-                Your knowledge web
+                How it connects
               </p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold text-ink">
-                {neighbours.length > 0 ? 'How this fits in' : 'Where it begins'}
-              </h2>
+              <h2 className="mt-2 font-serif text-2xl font-semibold text-ink">{concept.name}</h2>
             </div>
+
             {neighbours.length > 0 ? (
-              <>
-                <p className="text-sm leading-relaxed text-ink-soft">
-                  You already know some of this story. {concept.name} connects to:
+              <div className="space-y-2">
+                <p className="text-sm text-ink-soft">
+                  This links to things you already know:
                 </p>
                 <ul className="space-y-2">
                   {neighbours.map((n) => (
@@ -259,16 +251,15 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
                     </li>
                   ))}
                 </ul>
-                <p className="text-sm leading-relaxed text-ink-soft">
-                  Each new concept deepens the ones you already know.
-                </p>
-              </>
+              </div>
             ) : (
-              <p className="text-base leading-relaxed text-ink-soft">
-                This is a foundation concept — one of the anchors that everything else builds on. Starting here gives you the strongest base for everything that follows.
+              <p className="text-sm leading-relaxed text-ink-soft">
+                This is a foundation concept — one of the anchors everything else
+                will hang from as your map grows.
               </p>
             )}
-            <div className="mt-4 border-t border-ink/[0.06] pt-4">
+
+            <div className="mt-2 border-t border-ink/[0.06] pt-4">
               <AskThePast concept={concept} />
             </div>
           </div>
@@ -278,32 +269,21 @@ export function StoryBrief({ concept, threadName, onStart, onClose }: Props) {
       {/* Navigation footer */}
       <div className="flex-none px-5 pb-8 pt-3">
         {beat < TOTAL_BEATS - 1 ? (
-          <div className="flex items-center gap-3">
-            {beat > 0 && (
-              <button
-                type="button"
-                onClick={goPrev}
-                className="rounded-xl border border-ink/[0.10] bg-bg-soft px-5 py-3 text-sm text-ink-soft transition-colors hover:text-ink"
-              >
-                ←
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={goNext}
-              className="flex-1 rounded-xl bg-accent py-3 text-sm font-semibold text-on-accent transition-opacity active:opacity-80"
-            >
-              {beat === 0 ? 'Read the story' : 'See connections'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={goNext}
+            className="w-full rounded-xl bg-accent py-3.5 text-sm font-semibold text-on-accent transition-opacity active:opacity-80"
+          >
+            How it connects →
+          </button>
         ) : (
           <div className="space-y-2">
             <button
               type="button"
-              onClick={onStart}
+              onClick={onClose}
               className="w-full rounded-xl bg-accent py-3.5 text-sm font-semibold text-on-accent transition-opacity active:opacity-80"
             >
-              Begin today's session
+              Done
             </button>
             <button
               type="button"

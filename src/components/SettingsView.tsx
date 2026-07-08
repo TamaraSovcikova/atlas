@@ -251,6 +251,28 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           value={prefs.listenMode}
           onChange={(v) => update({ listenMode: v })}
         />
+        {prefs.listenMode && (
+          <div className="rounded-2xl border border-ink/[0.08] bg-bg-soft px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-ink">Reading speed</span>
+              <span className="text-sm tabular-nums text-ink-soft">{(prefs.speechRate ?? 1.0).toFixed(1)}×</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.1"
+              value={prefs.speechRate ?? 1.0}
+              onChange={(e) => update({ speechRate: parseFloat(e.target.value) })}
+              className="mt-2 w-full accent-accent"
+            />
+            <div className="mt-1 flex justify-between text-[10px] text-ink-softer">
+              <span>Slow</span>
+              <span>Normal</span>
+              <span>Fast</span>
+            </div>
+          </div>
+        )}
         {canInstall && (
           <button
             type="button"
