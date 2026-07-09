@@ -51,7 +51,260 @@ export interface SortItem {
   entries: SortEntry[]
 }
 
-export type SessionItem = RecallItem | OrderItem | SortItem
+// ── Recall minigames (Chat #21) ──────────────────────────────────────────────
+// Five retrieval games sharing ONE serialisable item kind. Each `data` payload is
+// plain (ids + names + indices), so persistence is pass-through and the card
+// components are presentation-only. Games only ever draw from already-MET concepts
+// (retrieval, not teaching). Pure builders below are unit-tested without a DB.
+
+export type GameVariant = 'pair' | 'odd' | 'drop' | 'era' | 'myth'
+
+export interface PairData {
+  pairs: { leftId: string; leftName: string; rightId: string; rightName: string; relation: string }[]
+}
+export interface OddData {
+  options: { id: string; name: string }[]
+  oddIndex: number
+  bond: string
+}
+export interface DropData {
+  anchors: { id: string; name: string; year: number }[]
+  target: { id: string; name: string; year: number }
+}
+export interface EraGuessData {
+  clues: string[]
+  clueConceptIds: string[]
+  answerEraId: string
+  options: { id: string; name: string }[]
+}
+export interface MythData {
+  conceptId: string
+  conceptName: string
+  statements: string[]
+  mythIndex: number
+}
+
+export type GameData = PairData | OddData | DropData | EraGuessData | MythData
+
+export interface GameItem {
+  kind: 'game'
+  cardKey: string
+  variant: GameVariant
+  /** Concepts this game exercises — for grading + session counts. */
+  conceptIds: string[]
+  data: GameData
+}
+
+export type SessionItem = RecallItem | OrderItem | SortItem | GameItem
+
+const RELATION_LABEL: Record<string, string> = {
+  caused: 'caused',
+  influenced_by: 'influenced',
+  contemporary_of: 'contemporary of',
+  located_in: 'located in',
+  part_of: 'part of',
+  opposed: 'opposed',
+  successor_of: 'succeeded',
+  belief_in: 'rooted in',
+  student_of: 'taught',
+}
+
+export function fmtYearLabel(y: number | null): string {
+  if (y === null) return ''
+  return y < 0 ? `${-y} BCE` : `${y} CE`
+}
+
+/** Deterministic shuffle (stable per key) so a rebuilt card doesn't reshuffle. */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const out = arr.map((x, i) => ({ x, k: hashString(seed + ':' + i) }))
+  out.sort((a, b) => a.k - b.k)
+  return out.map((o) => o.x)
+}
+
+/** Connect the Pair — match concepts to their graph-related partner. */
+export function buildPairGame(
+  concepts: { id: string; name: string }[],
+  edges: { fromId: string; toId: string; relation: string }[],
+  max = 4,
+): GameItem | null {
+  const byId = new Map(concepts.map((c) => [c.id, c]))
+  const used = new Set<string>()
+  const pairs: PairData['pairs'] = []
+  for (const e of edges) {
+    if (pairs.length >= max) break
+    const from = byId.get(e.fromId)
+    const to = byId.get(e.toId)
+    if (!from || !to || from.id === to.id) continue
+    if (used.has(from.id) || used.has(to.id)) continue
+    used.add(from.id)
+    used.add(to.id)
+    pairs.push({
+      leftId: from.id,
+      leftName: from.name,
+      rightId: to.id,
+      rightName: to.name,
+      relation: RELATION_LABEL[e.relation] ?? 'linked to',
+    })
+  }
+  if (pairs.length < 3) return null
+  const conceptIds = pairs.flatMap((p) => [p.leftId, p.rightId])
+  return { kind: 'game', variant: 'pair', cardKey: `pair:${conceptIds.join('-')}`, conceptIds, data: { pairs } }
+}
+
+/** Odd One Out — three share an era/thread, one doesn't. */
+export function buildOddGame(
+  concepts: { id: string; name: string; eras: string[]; domain: Domain }[],
+  eraNames: Map<string, string>,
+): GameItem | null {
+  // Prefer an era bond (more interesting than domain). Find an era with >=3
+  // members and at least one concept outside it.
+  const byEra = new Map<string, typeof concepts>()
+  for (const c of concepts) {
+    for (const e of c.eras) {
+      const list = byEra.get(e) ?? []
+      list.push(c)
+      byEra.set(e, list)
+    }
+  }
+  for (const [eraId, members] of byEra) {
+    if (members.length < 3) continue
+    const memberIds = new Set(members.map((m) => m.id))
+    const outsider = concepts.find((c) => !memberIds.has(c.id))
+    if (!outsider) continue
+    const three = members.slice(0, 3)
+    const options = seededShuffle([...three, outsider], eraId)
+    const oddIndex = options.findIndex((o) => o.id === outsider.id)
+    return {
+      kind: 'game',
+      variant: 'odd',
+      cardKey: `odd:${options.map((o) => o.id).join('-')}`,
+      conceptIds: options.map((o) => o.id),
+      data: { options: options.map((o) => ({ id: o.id, name: o.name })), oddIndex, bond: `all belong to ${eraNames.get(eraId) ?? 'one era'}` },
+    }
+  }
+  // Fallback: domain bond.
+  const byDomain = new Map<Domain, typeof concepts>()
+  for (const c of concepts) {
+    const list = byDomain.get(c.domain) ?? []
+    list.push(c)
+    byDomain.set(c.domain, list)
+  }
+  for (const [domain, members] of byDomain) {
+    if (members.length < 3) continue
+    const memberIds = new Set(members.map((m) => m.id))
+    const outsider = concepts.find((c) => !memberIds.has(c.id))
+    if (!outsider) continue
+    const three = members.slice(0, 3)
+    const options = seededShuffle([...three, outsider], domain)
+    const oddIndex = options.findIndex((o) => o.id === outsider.id)
+    return {
+      kind: 'game',
+      variant: 'odd',
+      cardKey: `odd:${options.map((o) => o.id).join('-')}`,
+      conceptIds: options.map((o) => o.id),
+      data: { options: options.map((o) => ({ id: o.id, name: o.name })), oddIndex, bond: `all are ${DOMAIN_LABEL[domain]}` },
+    }
+  }
+  return null
+}
+
+/** Timeline Drop — place one event among a mini-timeline of known events. */
+export function buildDropGame(
+  concepts: { id: string; name: string; approxYear: number | null }[],
+): GameItem | null {
+  const dated = concepts.filter((c) => c.approxYear !== null) as { id: string; name: string; approxYear: number }[]
+  const seenYears = new Set<number>()
+  const distinct = dated.filter((c) => (seenYears.has(c.approxYear) ? false : (seenYears.add(c.approxYear), true)))
+  if (distinct.length < 4) return null
+  const chosen = distinct.slice(0, 4).sort((a, b) => a.approxYear - b.approxYear)
+  // Target = one drawn from the middle so there are slots on both sides.
+  const targetIdx = chosen.length >= 4 ? 1 + (hashString(chosen[0]!.id) & 1) : 1
+  const target = chosen[targetIdx]!
+  const anchors = chosen.filter((c) => c.id !== target.id)
+  return {
+    kind: 'game',
+    variant: 'drop',
+    cardKey: `drop:${chosen.map((c) => c.id).join('-')}`,
+    conceptIds: chosen.map((c) => c.id),
+    data: {
+      anchors: anchors.map((a) => ({ id: a.id, name: a.name, year: a.approxYear })),
+      target: { id: target.id, name: target.name, year: target.approxYear },
+    },
+  }
+}
+
+/** Guess the Era — clues (sibling concepts) reveal one at a time; pick the era. */
+export function buildEraGuessGame(
+  concepts: { id: string; name: string; eras: string[] }[],
+  eraNames: Map<string, string>,
+): GameItem | null {
+  const byEra = new Map<string, typeof concepts>()
+  for (const c of concepts) {
+    for (const e of c.eras) {
+      const list = byEra.get(e) ?? []
+      list.push(c)
+      byEra.set(e, list)
+    }
+  }
+  for (const [eraId, members] of byEra) {
+    if (members.length < 3 || !eraNames.has(eraId)) continue
+    const clueConcepts = members.slice(0, 3)
+    const distractors = [...eraNames.keys()].filter((e) => e !== eraId)
+    const picked = seededShuffle(distractors, eraId).slice(0, 3)
+    const options = seededShuffle(
+      [eraId, ...picked].map((id) => ({ id, name: eraNames.get(id) ?? id })),
+      'opt:' + eraId,
+    )
+    return {
+      kind: 'game',
+      variant: 'era',
+      cardKey: `era:${eraId}:${clueConcepts.map((c) => c.id).join('-')}`,
+      conceptIds: clueConcepts.map((c) => c.id),
+      data: { clues: clueConcepts.map((c) => c.name), clueConceptIds: clueConcepts.map((c) => c.id), answerEraId: eraId, options },
+    }
+  }
+  return null
+}
+
+/** Two Truths & a Myth — three statements about a concept, one perturbed to false. */
+export function buildMythGame(
+  concepts: { id: string; name: string; domain: Domain; eras: string[]; approxYear: number | null; summary: string }[],
+  eraNames: Map<string, string>,
+): GameItem | null {
+  for (const c of concepts) {
+    const truths: string[] = []
+    if (c.approxYear !== null) truths.push(`${c.name} dates to roughly ${fmtYearLabel(c.approxYear)}.`)
+    const eraName = c.eras.map((e) => eraNames.get(e)).find(Boolean)
+    if (eraName) truths.push(`${c.name} belongs to the ${eraName} era.`)
+    truths.push(`${c.name} is a topic in ${DOMAIN_LABEL[c.domain].toLowerCase()}.`)
+    const firstSentence = c.summary.split(/(?<=[.!?])\s/)[0]?.trim()
+    if (firstSentence && firstSentence.length > 20 && firstSentence.length < 160) truths.push(firstSentence)
+
+    // Build a plausible myth by perturbing a real fact.
+    let myth: string | null = null
+    if (c.approxYear !== null) {
+      const shift = c.approxYear < 0 ? 700 : 500
+      const wrong = c.approxYear + (hashString(c.id) % 2 === 0 ? shift : -shift)
+      myth = `${c.name} dates to roughly ${fmtYearLabel(wrong)}.`
+    } else {
+      const others = (Object.keys(DOMAIN_LABEL) as Domain[]).filter((d) => d !== c.domain)
+      const wrong = others[hashString(c.id) % others.length]!
+      myth = `${c.name} is a topic in ${DOMAIN_LABEL[wrong].toLowerCase()}.`
+    }
+    if (truths.length < 2 || !myth) continue
+    const twoTruths = truths.slice(0, 2)
+    const statements = seededShuffle([...twoTruths, myth], c.id)
+    const mythIndex = statements.indexOf(myth)
+    return {
+      kind: 'game',
+      variant: 'myth',
+      cardKey: `myth:${c.id}`,
+      conceptIds: [c.id],
+      data: { conceptId: c.id, conceptName: c.name, statements, mythIndex },
+    }
+  }
+  return null
+}
 
 export interface SessionPlan {
   items: SessionItem[]
@@ -328,69 +581,73 @@ export async function buildRecallItemFor(
   return makeRecallItem(concept, review, concept.firstSeenAt === null, policy, 'feed', rotationIndex)
 }
 
-function injectGames(recall: RecallItem[], policy: Policy): SessionItem[] {
-  let items: SessionItem[] = interleave(recall)
-  // Games only draw from concepts the user has already met. Asking someone to
-  // chronologically order or sort a concept they first saw seconds ago reads as
-  // a trick question; ordering/sorting is a retrieval exercise, not a teaching
-  // one. New concepts are introduced via their brief + first recall instead.
-  const poolItems = recall.filter((r) => !r.isNew)
+/** Cap on the number of the new-style recall games injected per session (calm). */
+const MAX_NEW_GAMES = 2
 
+/**
+ * Inject retrieval games into a recall stream. Games only draw from already-MET
+ * concepts (retrieval, not teaching); each game "claims" its concepts so they are
+ * not also tested as a plain recall card in the same session. The classic Order
+ * game plus up to MAX_NEW_GAMES of the five new games are chosen from whatever the
+ * pool can support, then spaced evenly through the interleaved stream.
+ */
+async function injectGames(recall: RecallItem[], policy: Policy): Promise<SessionItem[]> {
+  const poolItems = recall.filter((r) => !r.isNew)
+  const used = new Set<string>()
+  const games: SessionItem[] = []
+
+  // Classic Order game (chronological drag) — unchanged behaviour, tracks `used`.
   if (policy.games.order) {
     const seenYears = new Set<number>()
     const datable: RecallItem[] = []
     for (const r of poolItems) {
-      if (r.concept.approxYear === null) continue
-      if (seenYears.has(r.concept.approxYear)) continue
+      if (r.concept.approxYear === null || seenYears.has(r.concept.approxYear)) continue
       seenYears.add(r.concept.approxYear)
       datable.push(r)
     }
     if (datable.length >= 3) {
       const chosen = datable.slice(0, 4)
-      const chosenIds = new Set(chosen.map((c) => c.concept.id))
-      items = items.filter((it) => it.kind !== 'recall' || !chosenIds.has(it.concept.id))
-      const orderItem: OrderItem = {
+      chosen.forEach((c) => used.add(c.concept.id))
+      games.push({
         kind: 'order',
         cardKey: `order:${chosen.map((c) => c.concept.id).join('-')}`,
         entries: chosen.map((c) => ({ concept: c.concept, review: c.review })),
-      }
-      items.splice(Math.min(2, items.length), 0, orderItem)
+      })
     }
   }
 
-  if (policy.games.sort) {
-    const remaining = items.filter(
-      (it): it is RecallItem => it.kind === 'recall' && !it.isNew,
-    )
-    const byDomain = new Map<Domain, RecallItem[]>()
-    for (const r of remaining) {
-      const list = byDomain.get(r.concept.domain) ?? []
-      list.push(r)
-      byDomain.set(r.concept.domain, list)
-    }
-    const domainsWithItems = [...byDomain.keys()]
-    if (domainsWithItems.length >= 2) {
-      const pickDomains = domainsWithItems.slice(0, 3)
-      const entries: SortEntry[] = []
-      // one from each picked domain, then top up from the first
-      for (const d of pickDomains) {
-        const first = byDomain.get(d)![0]!
-        entries.push({ concept: first.concept, review: first.review, bucketId: d })
-      }
-      const firstDomainList = byDomain.get(pickDomains[0]!)!
-      if (firstDomainList.length > 1 && entries.length < 4) {
-        const second = firstDomainList[1]!
-        entries.push({ concept: second.concept, review: second.review, bucketId: pickDomains[0]! })
-      }
-      if (entries.length >= 3) {
-        const ids = new Set(entries.map((e) => e.concept.id))
-        items = items.filter((it) => it.kind !== 'recall' || !ids.has(it.concept.id))
-        const buckets: SortBucket[] = pickDomains.map((d) => ({ id: d, label: DOMAIN_LABEL[d] }))
-        items.push({ kind: 'sort', cardKey: `sort:${[...ids].join('-')}`, buckets, entries })
-      }
-    }
+  // The five new games. Lazily fetch edges/era-names only when a game needs them.
+  const avail = () => poolItems.filter((r) => !used.has(r.concept.id)).map((r) => r.concept)
+  let eraNames: Map<string, string> | null = null
+  const getEraNames = async () => {
+    if (!eraNames) eraNames = new Map((await db.eras.toArray()).map((e) => [e.id, e.name]))
+    return eraNames
+  }
+  const claim = (g: GameItem | null) => {
+    if (!g || games.filter((x) => x.kind === 'game').length >= MAX_NEW_GAMES) return
+    g.conceptIds.forEach((id) => used.add(id))
+    games.push(g)
   }
 
+  if (policy.games.pair) {
+    const edges = await db.edges.toArray()
+    claim(buildPairGame(avail(), edges))
+  }
+  if (policy.games.odd) claim(buildOddGame(avail(), await getEraNames()))
+  if (policy.games.drop) claim(buildDropGame(avail()))
+  if (policy.games.eraGuess) claim(buildEraGuessGame(avail(), await getEraNames()))
+  if (policy.games.myth) claim(buildMythGame(avail(), await getEraNames()))
+
+  // Build the recall stream minus claimed concepts, then space games through it.
+  const remaining = recall.filter((r) => !used.has(r.concept.id))
+  const items: SessionItem[] = interleave(remaining)
+  if (games.length === 0) return items
+  const step = Math.max(1, Math.floor((items.length + 1) / (games.length + 1)))
+  let pos = step
+  for (const g of games) {
+    items.splice(Math.min(pos, items.length), 0, g)
+    pos += step + 1
+  }
   return items
 }
 
@@ -407,8 +664,8 @@ function countPlan(
     if (it.kind === 'recall') {
       if (it.isNew) newCount++
       else reviewCount++
-    } else if (it.kind === 'order') {
-      reviewCount += it.entries.length
+    } else if (it.kind === 'game') {
+      reviewCount += it.conceptIds.length
     } else {
       reviewCount += it.entries.length
     }
@@ -460,7 +717,7 @@ export async function buildEraSession(
   }
 
   const limited = recall.slice(0, maxCards)
-  const items = injectGames(limited, policy)
+  const items = await injectGames(limited, policy)
   return countPlan(items, 'era', eraId, null)
 }
 
@@ -507,7 +764,7 @@ export async function buildDomainSession(
   recall.sort((a, b) => (a.concept.approxYear ?? Infinity) - (b.concept.approxYear ?? Infinity))
   const limited = recall.slice(0, maxCards)
   // Order game fits a single-domain chronological session especially well.
-  const items = injectGames(limited, { ...policy, games: { ...policy.games, sort: false } })
+  const items = await injectGames(limited, { ...policy, games: { ...policy.games, sort: false } })
   return countPlan(items, 'domain', null, domain)
 }
 
@@ -529,7 +786,7 @@ export async function buildSpacedSession(
     if (item) recall.push(item)
   }
   const limited = recall.slice(0, maxCards)
-  const items = injectGames(limited, policy)
+  const items = await injectGames(limited, policy)
   return countPlan(items, 'spaced', null, null)
 }
 
@@ -559,7 +816,7 @@ export async function buildMistakesSession(
     if (item) recall.push(item)
   }
   const limited = recall.slice(0, maxCards)
-  const items = injectGames(limited, policy)
+  const items = await injectGames(limited, policy)
   return countPlan(items, 'mistakes', null, null)
 }
 
@@ -679,7 +936,7 @@ export async function buildDailySession(
   // resurface tomorrow.
   const reviewBudget = Math.max(0, maxCards - newItems.length)
   const combined = [...recall.slice(0, reviewBudget), ...newItems]
-  const items = injectGames(combined, policy)
+  const items = await injectGames(combined, policy)
   return countPlan(items, 'daily', null, null)
 }
 
@@ -755,7 +1012,7 @@ export async function buildThreadSession(
   // A thread is a timeline: present chronologically, not interleaved.
   recall.sort((a, b) => (a.concept.approxYear ?? Infinity) - (b.concept.approxYear ?? Infinity))
   const limited = recall.slice(0, maxCards)
-  const items = injectGames(limited, { ...policy, games: { ...policy.games, sort: false } })
+  const items = await injectGames(limited, { ...policy, games: { ...policy.games, sort: false } })
   return countPlan(items, 'thread', null, null, threadId)
 }
 
@@ -980,10 +1237,11 @@ export async function buildCollectionSession(
     const item = await makeRecallItem(concept, review, isNew, policy, 'col', rot++)
     if (item) recall.push(item)
   }
-  const items = injectGames(recall, policy)
+  const items = await injectGames(recall, policy)
   let newCount = 0, reviewCount = 0
   for (const it of items) {
     if (it.kind === 'recall') { if (it.isNew) newCount++; else reviewCount++ }
+    else if (it.kind === 'game') reviewCount += it.conceptIds.length
     else reviewCount += it.entries.length
   }
   return { items, newCount, reviewCount, shape: 'collection', eraId: null, domain: null, threadId: null, collectionId }

@@ -22,6 +22,7 @@ import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
 import { OrderCard } from './cards/OrderCard'
 import { SortCard } from './cards/SortCard'
+import { GameCard } from './cards/GameCard'
 import { SwipeRatingZone } from './SwipeRatingZone'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 import { Button } from './ui/Button'
@@ -48,6 +49,7 @@ interface UndoSnapshot {
 
 function primaryConceptId(item: SessionItem): string {
   if (item.kind === 'recall') return item.concept.id
+  if (item.kind === 'game') return item.conceptIds[0]!
   return item.entries[0]!.concept.id
 }
 
@@ -500,6 +502,9 @@ export function SessionView({ shape, eraId, domain, threadId, collectionId, onFi
               )}
               {current.kind === 'sort' && (
                 <SortCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
+              )}
+              {current.kind === 'game' && (
+                <GameCard item={current} onAnswered={handleAnswered} onDone={handleDone} />
               )}
             </div>
 

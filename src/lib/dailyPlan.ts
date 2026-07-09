@@ -11,6 +11,8 @@ import {
   type SessionItem,
   type SessionPlan,
   type SortBucket,
+  type GameVariant,
+  type GameData,
 } from './session'
 import type { Prefs } from './settings'
 
@@ -42,6 +44,15 @@ type StoredItem =
       cardKey: string
       buckets: SortBucket[]
       entries: { conceptId: string; bucketId: string }[]
+    }
+  | {
+      // The five recall games carry a fully-serialisable payload, so persistence
+      // is a straight pass-through — no concept refs to rehydrate.
+      kind: 'game'
+      cardKey: string
+      variant: GameVariant
+      conceptIds: string[]
+      data: GameData
     }
 
 interface StoredPlan {
@@ -82,6 +93,15 @@ function serialiseItem(item: SessionItem): StoredItem {
       conceptIds: item.entries.map((e) => e.concept.id),
     }
   }
+  if (item.kind === 'game') {
+    return {
+      kind: 'game',
+      cardKey: item.cardKey,
+      variant: item.variant,
+      conceptIds: item.conceptIds,
+      data: item.data,
+    }
+  }
   return {
     kind: 'sort',
     cardKey: item.cardKey,
@@ -118,6 +138,8 @@ async function rehydrateItems(stored: StoredItem[]): Promise<SessionItem[]> {
         if (concept && review) entries.push({ concept, review })
       }
       if (entries.length >= 3) out.push({ kind: 'order', cardKey: s.cardKey, entries })
+    } else if (s.kind === 'game') {
+      out.push({ kind: 'game', cardKey: s.cardKey, variant: s.variant, conceptIds: s.conceptIds, data: s.data })
     } else {
       const entries = []
       for (const e of s.entries) {

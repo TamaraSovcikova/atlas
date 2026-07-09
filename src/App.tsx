@@ -15,6 +15,7 @@ import { StatsView } from './components/StatsView'
 import { SettingsView } from './components/SettingsView'
 import { SessionView } from './components/SessionView'
 import { ConstellationScreen } from './components/ConstellationScreen'
+import { AtlasViz } from './components/AtlasViz'
 import { CollectionsView } from './components/CollectionsView'
 import { Onboarding } from './components/Onboarding'
 import { ConnectionChallenge } from './components/ConnectionChallenge'
@@ -274,7 +275,7 @@ function App() {
               <div className="space-y-5">
                 <SegmentControl
                   options={[
-                    { key: 'map' as AtlasPanel, label: 'Map' },
+                    { key: 'map' as AtlasPanel, label: 'Atlas' },
                     { key: 'pathway' as AtlasPanel, label: 'Pathway' },
                     { key: 'browse' as AtlasPanel, label: 'Browse' },
                     { key: 'collections' as AtlasPanel, label: 'Collections' },
@@ -283,7 +284,7 @@ function App() {
                   onChange={setAtlasPanel}
                 />
                 {atlasPanel === 'map' && (
-                  <ConstellationScreen onClose={() => setAtlasPanel('pathway')} />
+                  <AtlasViz onStartEra={(eraId) => startSession({ shape: 'era', eraId }, 'atlas')} />
                 )}
                 {atlasPanel === 'pathway' && (
                   <PathwayView

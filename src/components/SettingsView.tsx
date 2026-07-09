@@ -347,6 +347,36 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           value={prefs.enableContrast}
           onChange={(v) => update({ enableContrast: v })}
         />
+        <Toggle
+          label="Connect the pair"
+          desc="Match concepts to their related partner."
+          value={prefs.enablePair}
+          onChange={(v) => update({ enablePair: v })}
+        />
+        <Toggle
+          label="Odd one out"
+          desc="Spot the concept that doesn't fit the group."
+          value={prefs.enableOdd}
+          onChange={(v) => update({ enableOdd: v })}
+        />
+        <Toggle
+          label="Timeline drop"
+          desc="Slot one event into a mini-timeline you know."
+          value={prefs.enableDrop}
+          onChange={(v) => update({ enableDrop: v })}
+        />
+        <Toggle
+          label="Guess the era"
+          desc="Clues reveal one at a time — name the era."
+          value={prefs.enableEraGuess}
+          onChange={(v) => update({ enableEraGuess: v })}
+        />
+        <Toggle
+          label="Two truths & a myth"
+          desc="Three statements about a concept — spot the false one."
+          value={prefs.enableMyth}
+          onChange={(v) => update({ enableMyth: v })}
+        />
       </div>
 
       <div className="space-y-3">

@@ -9,6 +9,12 @@ export interface Prefs {
   enableSort: boolean
   enableMap: boolean
   enableContrast: boolean
+  /** New recall minigames (Chat #21). */
+  enablePair: boolean
+  enableOdd: boolean
+  enableDrop: boolean
+  enableEraGuess: boolean
+  enableMyth: boolean
   showConstellationReveal: boolean
   /** Cards per day that count as "goal met" and extend the streak. */
   dailyGoalCards: number
@@ -33,6 +39,11 @@ export const DEFAULT_PREFS: Prefs = {
   enableSort: true,
   enableMap: true,
   enableContrast: true,
+  enablePair: true,
+  enableOdd: true,
+  enableDrop: true,
+  enableEraGuess: true,
+  enableMyth: true,
   showConstellationReveal: true,
   dailyGoalCards: 12,
   streakFreezes: 2,
@@ -53,7 +64,16 @@ export interface Policy {
   // format used when a concept is brand new
   newConceptFormat: 'free' | 'cloze_chips'
   contrast: boolean
-  games: { order: boolean; sort: boolean; map: boolean }
+  games: {
+    order: boolean
+    sort: boolean
+    map: boolean
+    pair: boolean
+    odd: boolean
+    drop: boolean
+    eraGuess: boolean
+    myth: boolean
+  }
 }
 
 export function resolvePolicy(p: Prefs): Policy {
@@ -70,6 +90,11 @@ export function resolvePolicy(p: Prefs): Policy {
       // replacement recall games are tracked in the rework plan.
       sort: false,
       map: p.enableMap,
+      pair: p.enablePair,
+      odd: p.enableOdd,
+      drop: p.enableDrop,
+      eraGuess: p.enableEraGuess,
+      myth: p.enableMyth,
     },
   }
 }
