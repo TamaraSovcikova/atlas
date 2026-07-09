@@ -623,20 +623,23 @@ async function injectGames(recall: RecallItem[], policy: Policy): Promise<Sessio
     if (!eraNames) eraNames = new Map((await db.eras.toArray()).map((e) => [e.id, e.name]))
     return eraNames
   }
+  const capReached = () => games.filter((x) => x.kind === 'game').length >= MAX_NEW_GAMES
   const claim = (g: GameItem | null) => {
-    if (!g || games.filter((x) => x.kind === 'game').length >= MAX_NEW_GAMES) return
+    if (!g || capReached()) return
     g.conceptIds.forEach((id) => used.add(id))
     games.push(g)
   }
 
-  if (policy.games.pair) {
+  // Guard the cap BEFORE building so we skip wasted work (e.g. a full edges scan
+  // for the pair game) once the two-game cap is already claimed.
+  if (policy.games.pair && !capReached()) {
     const edges = await db.edges.toArray()
     claim(buildPairGame(avail(), edges))
   }
-  if (policy.games.odd) claim(buildOddGame(avail(), await getEraNames()))
-  if (policy.games.drop) claim(buildDropGame(avail()))
-  if (policy.games.eraGuess) claim(buildEraGuessGame(avail(), await getEraNames()))
-  if (policy.games.myth) claim(buildMythGame(avail(), await getEraNames()))
+  if (policy.games.odd && !capReached()) claim(buildOddGame(avail(), await getEraNames()))
+  if (policy.games.drop && !capReached()) claim(buildDropGame(avail()))
+  if (policy.games.eraGuess && !capReached()) claim(buildEraGuessGame(avail(), await getEraNames()))
+  if (policy.games.myth && !capReached()) claim(buildMythGame(avail(), await getEraNames()))
 
   // Build the recall stream minus claimed concepts, then space games through it.
   const remaining = recall.filter((r) => !used.has(r.concept.id))

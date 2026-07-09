@@ -118,5 +118,9 @@ describe('buildMythGame', () => {
     expect(data.mythIndex).toBeLessThan(3)
     // the myth is a real string present in statements
     expect(data.statements[data.mythIndex]).toBeTruthy()
+    // the myth must differ from the two truths (a perturbation collision that
+    // produced a "myth" identical to a real fact would be unwinnable)
+    const truths = data.statements.filter((_, i) => i !== data.mythIndex)
+    expect(truths).not.toContain(data.statements[data.mythIndex])
   })
 })

@@ -55,14 +55,14 @@ export function GameCard({ item, onAnswered, onDone }: Props) {
 // ── Connect the Pair ─────────────────────────────────────────────────────────
 
 function PairGame({ item, data, onDone, onAnswered }: Props & { data: PairData }) {
-  const rights = useMemo(() => shuffle(data.pairs.map((p) => p.rightId), item.cardKey), [item.cardKey])
+  const rights = useMemo(() => shuffle(data.pairs.map((p) => p.rightId), item.cardKey), [item.cardKey, data])
   const rightName = useMemo(
     () => new Map(data.pairs.map((p) => [p.rightId, p.rightName])),
-    [item.cardKey],
+    [item.cardKey, data],
   )
   const correctRightFor = useMemo(
     () => new Map(data.pairs.map((p) => [p.leftId, p.rightId])),
-    [item.cardKey],
+    [item.cardKey, data],
   )
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null)
   const [matches, setMatches] = useState<Record<string, string>>({})
@@ -94,7 +94,9 @@ function PairGame({ item, data, onDone, onAnswered }: Props & { data: PairData }
     const results: { conceptId: string; rating: RecallRating }[] = []
     for (const p of data.pairs) {
       const ok = matches[p.leftId] === p.rightId
-      const rating: RecallRating = ok ? 'good' : 'again'
+      // A wrong match is weaker evidence than a failed recall — 'hard' nudges the
+      // interval down without lapsing the concept.
+      const rating: RecallRating = ok ? 'good' : 'hard'
       results.push({ conceptId: p.leftId, rating }, { conceptId: p.rightId, rating })
     }
     onDone(results)
@@ -186,7 +188,14 @@ function OddGame({ data, onDone, onAnswered }: Props & { data: OddData }) {
   }
   function finish() {
     const correct = picked === data.oddIndex
-    onDone(data.options.map((o) => ({ conceptId: o.id, rating: (correct ? 'good' : 'again') as RecallRating })))
+    // Misjudging the group isn't evidence you've forgotten the concepts. Reinforce
+    // all on success; on a miss, nudge only the odd one ('hard', never a lapse).
+    const odd = data.options[data.oddIndex]!
+    onDone(
+      correct
+        ? data.options.map((o) => ({ conceptId: o.id, rating: 'good' as RecallRating }))
+        : [{ conceptId: odd.id, rating: 'hard' as RecallRating }],
+    )
   }
 
   return (
@@ -248,10 +257,9 @@ function DropGame({ data, onDone, onAnswered }: Props & { data: DropData }) {
   }
   function finish() {
     const targetOk = picked === correctSlot
-    onDone([
-      { conceptId: data.target.id, rating: (targetOk ? 'good' : 'again') as RecallRating },
-      ...anchors.map((a) => ({ conceptId: a.id, rating: 'good' as RecallRating })),
-    ])
+    // Only the target is being recalled; the anchors are shown as context, so don't
+    // advance their FSRS schedule as if they'd each been reviewed.
+    onDone([{ conceptId: data.target.id, rating: (targetOk ? 'good' : 'again') as RecallRating }])
   }
 
   // Render slots interleaved with anchors: slot 0, anchor 0, slot 1, anchor 1, …
@@ -329,7 +337,8 @@ function EraGame({ data, onDone, onAnswered }: Props & { data: EraGuessData }) {
   }
   function finish() {
     const correct = picked === data.answerEraId
-    onDone(data.clueConceptIds.map((id) => ({ conceptId: id, rating: (correct ? 'good' : 'again') as RecallRating })))
+    // Missing the era shouldn't lapse the individual concepts — 'hard' at worst.
+    onDone(data.clueConceptIds.map((id) => ({ conceptId: id, rating: (correct ? 'good' : 'hard') as RecallRating })))
   }
 
   return (
