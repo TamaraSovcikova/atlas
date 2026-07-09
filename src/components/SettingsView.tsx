@@ -336,12 +336,6 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           onChange={(v) => update({ enableOrder: v })}
         />
         <Toggle
-          label="Sort into groups"
-          desc="Drop concepts into the right category."
-          value={prefs.enableSort}
-          onChange={(v) => update({ enableSort: v })}
-        />
-        <Toggle
           label="Tap on the map"
           desc="Find places on a world map."
           value={prefs.enableMap}

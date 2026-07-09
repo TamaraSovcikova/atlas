@@ -322,10 +322,14 @@ async function handleAI(req: Request, env: Env): Promise<Response> {
   // Pooled path: check rate limits (simple global cap via D1)
   const capEnv = parseInt(env.AI_DAILY_CAP ?? '500', 10)
   const dayKey = `ai:day:${new Date().toISOString().slice(0, 10)}`
+  // The counter reuses the backups table (token = dayKey), storing the count in
+  // the `payload` column — there is no `value` column, so reading one throws a
+  // D1 exception, which Cloudflare surfaces as a 1101 (500) WITHOUT CORS headers,
+  // which the browser then reports to the app as "Network error: failed to fetch".
   const capRow = await env.DB.prepare(
-    'SELECT value FROM backups WHERE token = ?',
-  ).bind(dayKey).first<{ value?: string }>()
-  const todayCount = parseInt(capRow?.value ?? '0', 10)
+    'SELECT payload FROM backups WHERE token = ?',
+  ).bind(dayKey).first<{ payload?: string }>()
+  const todayCount = parseInt(capRow?.payload ?? '0', 10)
   if (todayCount >= capEnv) {
     return json({ error: 'Daily AI cap reached. Try again tomorrow or add your own key in Settings.' }, 429)
   }
@@ -361,9 +365,12 @@ async function handleAI(req: Request, env: Env): Promise<Response> {
      ON CONFLICT(token) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
   ).bind(dayKey, String(newCount), Date.now()).run()
 
-  // Try Gemini, fall back to Groq
+  // Try Gemini, cascade to Groq on any failure (quota, 502, exception).
   if (env.GEMINI_API_KEY) {
-    return callGemini(env.GEMINI_API_KEY, body.prompt, body.system ?? '', false)
+    const res = await callGemini(env.GEMINI_API_KEY, body.prompt, body.system ?? '', false)
+    if (res.ok) return res
+    if (env.GROQ_API_KEY) return callGroq(env.GROQ_API_KEY, body.prompt, body.system ?? '')
+    return res
   }
   if (env.GROQ_API_KEY) {
     return callGroq(env.GROQ_API_KEY, body.prompt, body.system ?? '')
@@ -437,14 +444,21 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
-    if (url.pathname === '/health') return json({ ok: true })
-    if (url.pathname === '/sync') return handleSync(req, env)
-    if (url.pathname === '/auth/google/start') return handleGoogleStart(req, env)
-    if (url.pathname === '/auth/google/callback') return handleGoogleCallback(req, env)
-    if (url.pathname === '/auth/logout' && req.method === 'POST') return handleLogout(req, env)
-    if (url.pathname === '/me') return handleMe(req, env)
-    if (url.pathname === '/account/claim' && req.method === 'POST') return handleClaim(req, env)
-    if (url.pathname === '/ai' && req.method === 'POST') return handleAI(req, env)
-    return json({ error: 'not found' }, 404)
+    // Wrap every handler so an unexpected exception still returns JSON WITH CORS
+    // headers. A bare thrown error becomes a Cloudflare 1101 with no CORS, which
+    // the browser reports to the app as an opaque "failed to fetch".
+    try {
+      if (url.pathname === '/health') return json({ ok: true })
+      if (url.pathname === '/sync') return await handleSync(req, env)
+      if (url.pathname === '/auth/google/start') return await handleGoogleStart(req, env)
+      if (url.pathname === '/auth/google/callback') return await handleGoogleCallback(req, env)
+      if (url.pathname === '/auth/logout' && req.method === 'POST') return await handleLogout(req, env)
+      if (url.pathname === '/me') return await handleMe(req, env)
+      if (url.pathname === '/account/claim' && req.method === 'POST') return await handleClaim(req, env)
+      if (url.pathname === '/ai' && req.method === 'POST') return await handleAI(req, env)
+      return json({ error: 'not found' }, 404)
+    } catch (e) {
+      return json({ error: `Server error: ${(e as Error).message}` }, 500)
+    }
   },
 }

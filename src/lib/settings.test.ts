@@ -30,6 +30,10 @@ describe('resolvePolicy', () => {
     const p = resolvePolicy({ ...DEFAULT_PREFS, enableMap: false, enableOrder: false })
     expect(p.games.map).toBe(false)
     expect(p.games.order).toBe(false)
-    expect(p.games.sort).toBe(true)
+  })
+
+  it('sort game is retired (always off regardless of pref)', () => {
+    const p = resolvePolicy({ ...DEFAULT_PREFS, enableSort: true })
+    expect(p.games.sort).toBe(false)
   })
 })

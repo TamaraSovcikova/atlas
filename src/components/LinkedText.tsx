@@ -1,14 +1,18 @@
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
+import { cleanText } from '../lib/cleanText'
 
 interface Props {
   text: string
   onConceptClick: (conceptId: string) => void
 }
 
-export function LinkedText({ text, onConceptClick }: Props) {
+export function LinkedText({ text: rawText, onConceptClick }: Props) {
   const concepts = useLiveQuery(() => db.concepts.toArray(), [])
+  // Strip Markdown / LaTeX artifacts (chiefly from AI-generated summaries) so
+  // cards never show literal "**", "$x^{2}$", or broken fragments like "+a}$".
+  const text = useMemo(() => cleanText(rawText), [rawText])
 
   const parts = useMemo(() => {
     if (!concepts || concepts.length === 0) return [{ text, id: null as string | null }]

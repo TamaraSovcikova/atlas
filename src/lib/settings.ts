@@ -65,7 +65,10 @@ export function resolvePolicy(p: Prefs): Policy {
     contrast: p.enableContrast,
     games: {
       order: p.enableOrder,
-      sort: p.enableSort,
+      // "Sort into categories" retired — it tested domain-labelling rather than
+      // recall and read as filler. Forced off regardless of the stored pref;
+      // replacement recall games are tracked in the rework plan.
+      sort: false,
       map: p.enableMap,
     },
   }

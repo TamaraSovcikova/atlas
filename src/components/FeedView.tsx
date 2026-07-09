@@ -14,6 +14,7 @@ import { FeedCard, type SwipeInterest } from './FeedCard'
 
 const INITIAL_BATCH = 6
 const PAGE_BATCH = 5
+const RATE_STEPS = [0.75, 1.0, 1.25, 1.5, 2.0]
 
 interface Props {
   onOpenConcept: (concept: Concept, threadName: string | null) => void
@@ -88,6 +89,15 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length])
 
+  // Seed one new-concept card into FSRS (firstSeenAt + a 'good' schedule) so it
+  // counts as "covered" and never reappears as New. Idempotent via gradedKeys.
+  const seedConcept = useCallback((item: FeedItem | undefined, now = Date.now()) => {
+    if (!item || item.kind !== 'concept' || gradedKeys.current.has(item.key)) return
+    gradedKeys.current.add(item.key)
+    recordRating(item.concept.id, 'good', now).catch(() => {})
+    recordFeedCard('good', true, now).catch(() => {})
+  }, [])
+
   function handleCurrentChange(idx: number) {
     const prevIdx = currentIndexRef.current
     const now = Date.now()
@@ -96,14 +106,12 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
 
     const prev = items[prevIdx]
 
-    // Seed FSRS for new concept cards that left the screen without a "Got it" press.
-    // This covers two cases: interest-swipe (advance without grading) and plain scroll-past.
-    // Without this, firstSeenAt stays null and the card reappears as "New" next session.
-    if (prev && prev.kind === 'concept' && !gradedKeys.current.has(prev.key)) {
-      gradedKeys.current.add(prev.key)
-      recordRating(prev.concept.id, 'good', now).catch(() => {})
-      recordFeedCard('good', true, now).catch(() => {})
-    }
+    // Seed EVERY new concept card at or above where we now are — anything the
+    // user has scrolled past counts as covered. Seeding only the immediately
+    // previous card missed fast flicks (intermediate cards never hit the 0.6
+    // intersection threshold), which is why covered concepts kept coming back
+    // as "New". gradedKeys makes this idempotent.
+    for (let i = 0; i < idx && i < items.length; i++) seedConcept(items[i], now)
 
     // Implicit dwell signal for the item we just left (discovery cards only —
     // reviews are graded, not interest-rated).
@@ -117,6 +125,26 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     setCurrentIndex(idx)
     if (idx >= items.length - 2) appendMore()
   }
+
+  // The card you're on when you background/close the app never "leaves the
+  // viewport", so seed the current card on tab-hide and on unmount — otherwise
+  // the last concept you read each session is lost and shows as New next time.
+  useEffect(() => {
+    function seedCurrent() {
+      seedConcept(items[currentIndexRef.current])
+    }
+    function onVisibility() {
+      if (document.visibilityState === 'hidden') seedCurrent()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', seedCurrent)
+    return () => {
+      seedCurrent()
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', seedCurrent)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
 
   // ── Advance / interest ───────────────────────────────────────────────────────
   const advanceTo = useCallback((j: number) => {
@@ -177,6 +205,24 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
             </svg>
           )}
         </button>
+
+        {/* Reading-speed chip — appears beside the listen toggle when it's on,
+            so the speed control lives where listen mode is actually used. */}
+        {prefs.listenMode && (
+          <button
+            type="button"
+            onClick={() => {
+              const cur = prefs.speechRate ?? 1.0
+              const i = RATE_STEPS.findIndex((r) => Math.abs(r - cur) < 0.01)
+              const next = RATE_STEPS[(i + 1) % RATE_STEPS.length]!
+              updatePrefs({ speechRate: next })
+            }}
+            className="rounded-full border border-ink/[0.08] bg-bg/80 px-2.5 py-1 text-[11px] tabular-nums text-accent backdrop-blur-sm transition-colors hover:text-ink"
+            aria-label="Change reading speed"
+          >
+            {(prefs.speechRate ?? 1.0).toFixed(2).replace(/0$/, '')}×
+          </button>
+        )}
 
         <button
           type="button"
