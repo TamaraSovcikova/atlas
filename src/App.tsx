@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Domain, type Concept } from './db/schema'
 import { progressSnapshot } from './lib/progress'
 import { loadSeedIfNeeded } from './db/seed'
+import { pullCommunityConcepts } from './lib/community'
 import { useSettings } from './store/useSettings'
 import { MotionProvider } from './components/ui/motion'
 import { BottomNav, type Tab } from './components/BottomNav'
@@ -70,6 +71,9 @@ function App() {
         setShowOnboarding(!onboarded?.value)
         setReady(true)
       }
+      // Pull community-generated concepts in the background (online-only, never
+      // blocks first paint). New cards appear via live queries when they land.
+      pullCommunityConcepts().catch(() => {})
     }
     init()
     return () => {

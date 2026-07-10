@@ -438,6 +438,58 @@ async function callGroq(apiKey: string, prompt: string, system: string): Promise
   }
 }
 
+// ---- Community concepts (shared AI-generated bank) --------------------------
+//
+// When a user generates a card for a topic the vault doesn't have, it's
+// contributed here so every user gets it, not just the author. Ids are stable
+// (`ai:<slug>`), so the same topic dedups globally and INSERT OR IGNORE keeps the
+// first author's version (a topic can't later be overwritten/vandalised).
+
+const MAX_CONCEPT_BYTES = 64 * 1024
+
+async function handleConcepts(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url)
+
+  if (req.method === 'GET') {
+    const since = parseInt(url.searchParams.get('since') ?? '0', 10) || 0
+    const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get('limit') ?? '500', 10) || 500))
+    const rows = await env.DB.prepare(
+      'SELECT payload, created_at FROM community_concepts WHERE created_at > ? ORDER BY created_at ASC LIMIT ?',
+    ).bind(since, limit).all<{ payload: string; created_at: number }>()
+    const results = rows.results ?? []
+    const concepts = results
+      .map((r) => { try { return JSON.parse(r.payload) } catch { return null } })
+      .filter((c) => c !== null)
+    // Advance the cursor to the newest row returned so paging resumes correctly
+    // even when more than `limit` concepts exist since `since`.
+    const cursor = results.length ? results[results.length - 1]!.created_at : since
+    return json({ concepts, cursor })
+  }
+
+  if (req.method === 'POST') {
+    const text = await req.text()
+    if (text.length > MAX_CONCEPT_BYTES) return json({ error: 'concept too large' }, 413)
+    let body: { concept?: Record<string, unknown> }
+    try { body = JSON.parse(text) } catch { return json({ error: 'invalid body' }, 400) }
+    const c = body.concept
+    if (!c || typeof c !== 'object') return json({ error: 'concept required' }, 400)
+    const id = typeof c.id === 'string' ? c.id : ''
+    const name = typeof c.name === 'string' ? c.name : ''
+    const summary = typeof c.summary === 'string' ? c.summary : ''
+    if (!id.startsWith('ai:') || name.length < 1 || summary.length < 1) {
+      return json({ error: 'concept must have an ai: id, a name, and a summary' }, 400)
+    }
+    const nameKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '')
+    await env.DB.prepare(
+      `INSERT INTO community_concepts (id, payload, name, name_key, created_at)
+       VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+    ).bind(id, JSON.stringify(c), name, nameKey, Date.now()).run()
+    return json({ ok: true })
+  }
+
+  return json({ error: 'method not allowed' }, 405)
+}
+
 // ---- Main fetch handler -------------------------------------------------------
 
 export default {
@@ -456,6 +508,7 @@ export default {
       if (url.pathname === '/me') return await handleMe(req, env)
       if (url.pathname === '/account/claim' && req.method === 'POST') return await handleClaim(req, env)
       if (url.pathname === '/ai' && req.method === 'POST') return await handleAI(req, env)
+      if (url.pathname === '/concepts') return await handleConcepts(req, env)
       return json({ error: 'not found' }, 404)
     } catch (e) {
       return json({ error: `Server error: ${(e as Error).message}` }, 500)

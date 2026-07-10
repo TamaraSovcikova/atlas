@@ -231,7 +231,10 @@ Return a single JSON object for the closest matching historical/world-knowledge 
     }
     const VALID_DOMAINS = ['history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world']
     const name = parsed.name ?? query
-    const id = `ai:${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}_${Date.now()}`
+    // Stable id (no timestamp) so the SAME topic gets the SAME id for every user.
+    // That lets a generated concept dedup globally and be shared via the community
+    // concepts endpoint instead of forking a new card per person.
+    const id = `ai:${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48)}`
     return {
       ok: true,
       concept: {

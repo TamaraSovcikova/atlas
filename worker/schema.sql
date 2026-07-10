@@ -29,3 +29,15 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- Community-contributed AI concepts. When a user generates a card for a topic
+-- the vault lacks, it's shared here so every user gets it. Stable `ai:<slug>` ids
+-- dedup a topic globally; INSERT OR IGNORE keeps the first author's version.
+CREATE TABLE IF NOT EXISTS community_concepts (
+  id         TEXT PRIMARY KEY,     -- ai:<slug>, stable across users
+  payload    TEXT NOT NULL,        -- JSON of the generated concept
+  name       TEXT,
+  name_key   TEXT,                 -- normalised name for lookup/dedup
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS community_concepts_created ON community_concepts(created_at);
