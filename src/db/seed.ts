@@ -104,8 +104,12 @@ export async function loadSeedIfNeeded(): Promise<void> {
         if (!review) await db.reviews.add(newReview(c.id, now))
       }
 
-      // Rebuild non-personal edges from the bank; keep user-authored ones.
-      const personalEdges = await db.edges.filter((e) => e.isPersonal).toArray()
+      // Rebuild non-personal edges from the bank; keep user-authored ones AND any
+      // edge touching an `ai:` concept (deepen-on-demand / community links, which
+      // aren't in the bank and would otherwise be wiped on every version bump).
+      const personalEdges = await db.edges
+        .filter((e) => e.isPersonal || e.fromId.startsWith('ai:') || e.toId.startsWith('ai:'))
+        .toArray()
       await db.edges.clear()
       for (const e of personalEdges) await db.edges.add(e)
       for (const c of BANK_CONCEPTS) {
@@ -122,10 +126,12 @@ export async function loadSeedIfNeeded(): Promise<void> {
         }
       }
 
-      // Remove concepts that the bank no longer contains (and their artefacts).
+      // Remove concepts that the bank no longer contains (and their artefacts),
+      // but PRESERVE `ai:` concepts (AI-generated / community / deepen-on-demand) —
+      // they live outside the static bank and must survive version bumps.
       const allConcepts = await db.concepts.toArray()
       for (const c of allConcepts) {
-        if (bankIds.has(c.id)) continue
+        if (bankIds.has(c.id) || c.id.startsWith('ai:')) continue
         await db.concepts.delete(c.id)
         if (c.lessonId) await db.lessons.delete(c.lessonId)
         const stale = await db.reviews.where('conceptId').equals(c.id).toArray()

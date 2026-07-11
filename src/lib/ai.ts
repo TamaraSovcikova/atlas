@@ -1,4 +1,4 @@
-import { db } from '../db/schema'
+import { db, type RelationType } from '../db/schema'
 import { SYNC_URL } from './sync'
 
 /**
@@ -253,6 +253,88 @@ Return a single JSON object for the closest matching historical/world-knowledge 
     }
   } catch {
     return { ok: false, error: 'Could not parse AI response. Try a different search.' }
+  }
+}
+
+const DEEP_RELATIONS: RelationType[] = [
+  'caused', 'influenced_by', 'contemporary_of', 'located_in', 'part_of',
+  'opposed', 'successor_of', 'belief_in', 'student_of',
+]
+
+export interface DeepConcept {
+  id: string
+  name: string
+  domain: string
+  summary: string
+  approxYear: number | null
+  wikipediaUrl: string | null
+  /** How the SEED concept relates to this deeper one. */
+  relation: RelationType
+}
+
+/**
+ * Deepen-on-demand: generate 3-5 MORE SPECIFIC concepts under a seed concept
+ * (sub-events, key people, causes, consequences), so swiping "more" on a topic
+ * with little linked content keeps the graph growing. Each carries a relation
+ * back to the seed so it can be wired into the knowledge graph. Ids are stable
+ * (`ai:<slug>`) so they dedup + share globally like any generated concept.
+ */
+export async function generateDeeperConcepts(
+  seedName: string,
+  seedSummary: string,
+  known: string[],
+): Promise<{ ok: true; concepts: DeepConcept[] } | { ok: false; error: string }> {
+  const system = `You are Atlas, a structured knowledge database for a learning app.
+Return ONLY valid JSON — no markdown fences, no prose, nothing outside the JSON object.`
+  const prompt = `Seed concept: "${seedName}" — ${seedSummary.slice(0, 300)}
+
+Return 3-5 MORE SPECIFIC concepts that go one level deeper into this topic — key
+sub-events, people, causes, consequences, or closely related ideas someone
+exploring "${seedName}" would want next. Do NOT repeat any of these already-covered
+concepts: ${known.slice(0, 25).join(', ') || 'none'}.
+
+Return a single JSON object:
+{ "concepts": [
+  {
+    "name": "canonical English name",
+    "domain": "one of: history|geography|politics|religions|culture|science|modern_world",
+    "summary": "2-3 sentence encyclopedic summary",
+    "approxYear": year as integer or null,
+    "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null,
+    "relation": "how the SEED relates to this concept — one of: caused|influenced_by|contemporary_of|located_in|part_of|opposed|successor_of|belief_in|student_of"
+  }
+] }`
+
+  const res = await callAI(prompt, system)
+  if (!res.ok) return res
+
+  try {
+    const cleaned = res.reply.trim().replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '')
+    const parsed = JSON.parse(cleaned) as { concepts?: Array<Record<string, unknown>> }
+    const VALID_DOMAINS = ['history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world']
+    const out: DeepConcept[] = []
+    const seenIds = new Set<string>()
+    for (const c of parsed.concepts ?? []) {
+      const name = typeof c.name === 'string' ? c.name.trim() : ''
+      const summary = typeof c.summary === 'string' ? c.summary : ''
+      if (!name || !summary) continue
+      const id = `ai:${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48)}`
+      if (!id || seenIds.has(id)) continue
+      seenIds.add(id)
+      out.push({
+        id,
+        name,
+        domain: VALID_DOMAINS.includes(c.domain as string) ? (c.domain as string) : 'history',
+        summary,
+        approxYear: typeof c.approxYear === 'number' ? c.approxYear : null,
+        wikipediaUrl: typeof c.wikipediaUrl === 'string' ? c.wikipediaUrl : null,
+        relation: DEEP_RELATIONS.includes(c.relation as RelationType) ? (c.relation as RelationType) : 'part_of',
+      })
+    }
+    if (out.length === 0) return { ok: false, error: 'No deeper concepts returned.' }
+    return { ok: true, concepts: out }
+  } catch {
+    return { ok: false, error: 'Could not parse deeper concepts.' }
   }
 }
 

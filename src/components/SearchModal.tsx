@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { db, type Concept, type Collection } from '../db/schema'
 import { generateConcept } from '../lib/ai'
-import { contributeConcept } from '../lib/community'
+import { contributeConcept, insertAiConcept } from '../lib/community'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 
 interface ThreadResult {
@@ -96,22 +96,12 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
       return
     }
 
-    // Save the AI-generated concept to the local DB so it shows in search results
-    // and can be studied later. Mark as AI-generated via the id prefix.
-    const now = Date.now()
-    const concept: Concept = {
-      ...res.concept,
-      domain: res.concept.domain as Concept['domain'],
-      lessonId: null,
-      firstSeenAt: null,
-      lastReviewedAt: null,
-      createdAt: now,
-    }
-    await db.concepts.put(concept)
-    // Share it with everyone: the topic joins the community bank, not just this
-    // person's vault. Fire-and-forget — the local save above already succeeded.
+    // Save the AI-generated concept locally (with a review row so it can be
+    // tracked) and share it to the community bank so everyone gets it, not just
+    // this person's vault. Fire-and-forget contribution.
+    await insertAiConcept(res.concept)
     contributeConcept(res.concept)
-    setRabbitHoleId(concept.id)
+    setRabbitHoleId(res.concept.id)
   }
 
   // A card ABOUT the query = a name match. Generation is offered whenever there's

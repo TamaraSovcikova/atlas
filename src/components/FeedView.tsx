@@ -4,10 +4,13 @@ import {
   freshFeedState,
   loadInterest,
   nextFeedBatch,
+  primaryConcept,
   recordSwipe,
   type FeedItem,
   type FeedState,
 } from '../lib/feed'
+import { connectionsFor } from '../lib/connections'
+import { deepenConcept } from '../lib/community'
 import { recordRating, recordFeedCard } from '../lib/grade'
 import { useSettings } from '../store/useSettings'
 import { FeedCard, type SwipeInterest } from './FeedCard'
@@ -27,6 +30,9 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
+  // Name of the topic currently being deepened via AI (for a subtle indicator).
+  const [deepening, setDeepening] = useState<string | null>(null)
+  const deepenedKeys = useRef<Set<string>>(new Set())
 
   const stateRef = useRef<FeedState | null>(null)
   const loadingRef = useRef(false)
@@ -152,6 +158,36 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
+  // Deepen-on-demand: when the user asks for "more" on a topic that has little
+  // unseen linked content left, generate deeper related cards via AI, wire them
+  // into the graph, and surface them next. Best-effort + online-only; at most one
+  // attempt per concept per session.
+  const maybeDeepen = useCallback(async (item: FeedItem) => {
+    const concept = primaryConcept(item)
+    if (deepenedKeys.current.has(concept.id)) return
+    const hits = await connectionsFor(concept.id, 6)
+    const unseen = hits.filter((h) => h.concept.firstSeenAt === null)
+    if (unseen.length >= 3) return // plenty to explore already — don't spend an AI call
+    deepenedKeys.current.add(concept.id)
+    setDeepening(concept.name)
+    const ids = await deepenConcept(concept.id)
+    setDeepening(null)
+    if (!ids.length || !stateRef.current) return
+    // Seed the deep-queue with the new concepts, then pull a batch so they appear.
+    const shown = stateRef.current.shownConceptIds
+    const fresh = ids.filter((id) => !shown.has(id))
+    stateRef.current = {
+      ...stateRef.current,
+      deepQueue: [...fresh, ...stateRef.current.deepQueue.filter((d) => !fresh.includes(d))].slice(0, 16),
+    }
+    const res = await nextFeedBatch(stateRef.current, PAGE_BATCH)
+    stateRef.current = res.state
+    if (res.items.length) {
+      setExhausted(false)
+      setItems((prev) => [...prev, ...res.items])
+    }
+  }, [])
+
   const handleInterest = useCallback(
     (index: number, item: FeedItem, direction: SwipeInterest) => {
       swipedKeys.current.add(item.key)
@@ -161,9 +197,11 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
           stateRef.current = s
         })
       }
+      // "More" (left) is the deepen signal.
+      if (direction === 'left') void maybeDeepen(item)
       advanceTo(index + 1)
     },
-    [advanceTo],
+    [advanceTo, maybeDeepen],
   )
 
   // ── Pull-down-at-top → Dashboard ─────────────────────────────────────────────
@@ -239,6 +277,18 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
         {/* Spacer to keep Today centred */}
         <div className="w-8" />
       </div>
+
+      {/* Deepen-on-demand indicator — the graph is growing toward what you asked for */}
+      {deepening && (
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-full border border-accent/20 bg-bg/90 px-3.5 py-1.5 text-[11px] text-accent shadow-card backdrop-blur-sm">
+            <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Digging deeper into {deepening}…
+          </div>
+        </div>
+      )}
 
       <div
         ref={containerRef}
