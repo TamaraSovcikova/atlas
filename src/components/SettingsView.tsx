@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../store/useSettings'
 import {
   INTENSITY_LABEL,
+  KNOWLEDGE_LEVELS,
+  KNOWLEDGE_LEVEL_LABEL,
   GOAL_OPTIONS,
   MAX_STREAK_FREEZES,
   type Intensity,
@@ -282,6 +284,38 @@ export function SettingsView({ canInstall, onInstall }: Props) {
             Install Atlas on this device
           </button>
         )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Knowledge level</h3>
+        <p className="text-xs text-ink-softer">
+          How deep new material starts. Changes apply from your next session.
+        </p>
+        <div className="space-y-2" role="radiogroup" aria-label="Knowledge level">
+          {KNOWLEDGE_LEVELS.map((key) => {
+            const active = prefs.knowledgeLevel === key
+            const label = KNOWLEDGE_LEVEL_LABEL[key]
+            return (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => update({ knowledgeLevel: key })}
+                className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                  active
+                    ? 'border-accent/70 bg-accent/10'
+                    : 'border-bg-softer/40 bg-bg-soft/50 hover:border-accent/40'
+                }`}
+              >
+                <p className={`text-sm font-medium ${active ? 'text-accent' : 'text-ink'}`}>
+                  {label.title}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-softer">{label.blurb}</p>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="space-y-3">

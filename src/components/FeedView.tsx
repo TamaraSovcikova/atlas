@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Concept } from '../db/schema'
 import {
   freshFeedState,
+  loadCeilingAck,
   loadInterest,
   nextFeedBatch,
   primaryConcept,
   recordSwipe,
+  saveCeilingAck,
   type FeedItem,
   type FeedState,
 } from '../lib/feed'
@@ -33,6 +35,27 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
   // Name of the topic currently being deepened via AI (for a subtle indicator).
   const [deepening, setDeepening] = useState<string | null>(null)
   const deepenedKeys = useRef<Set<string>>(new Set())
+  // Knowledge-level gate pill (§4b): "Foundations first" while a 'new'-level
+  // user's gate is at stage 1; a one-shot "Deeper waters" moment when it rises.
+  const [gatePill, setGatePill] = useState<'foundations' | 'unlocked' | null>(null)
+
+  const updateGatePill = useCallback(async (stage: 1 | 2 | 3 | null) => {
+    if (stage === null) {
+      setGatePill(null)
+      return
+    }
+    const ack = await loadCeilingAck()
+    if (stage > ack) {
+      // One-shot: acknowledge immediately so the moment shows for this batch
+      // only, then fades on the next batch load.
+      setGatePill('unlocked')
+      await saveCeilingAck(stage)
+    } else if (stage === 1) {
+      setGatePill('foundations')
+    } else {
+      setGatePill(null)
+    }
+  }, [])
 
   const stateRef = useRef<FeedState | null>(null)
   const loadingRef = useRef(false)
@@ -50,29 +73,46 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
   const appendMore = useCallback(async () => {
     if (loadingRef.current || exhausted || !stateRef.current) return
     loadingRef.current = true
-    const res = await nextFeedBatch(stateRef.current, PAGE_BATCH)
+    // Read prefs from the store directly so a Settings level change applies to
+    // the very next batch without re-creating callbacks / re-initing the feed.
+    const res = await nextFeedBatch(
+      stateRef.current,
+      PAGE_BATCH,
+      undefined,
+      undefined,
+      useSettings.getState().prefs,
+    )
     stateRef.current = res.state
     if (res.items.length === 0) setExhausted(true)
     else setItems((prev) => [...prev, ...res.items])
+    void updateGatePill(res.gateStage)
     loadingRef.current = false
-  }, [exhausted])
+  }, [exhausted, updateGatePill])
 
   useEffect(() => {
     let cancelled = false
     async function init() {
       const weights = await loadInterest()
       const state = freshFeedState(weights)
-      const res = await nextFeedBatch(state, INITIAL_BATCH)
+      const res = await nextFeedBatch(
+        state,
+        INITIAL_BATCH,
+        undefined,
+        undefined,
+        useSettings.getState().prefs,
+      )
       if (cancelled) return
       stateRef.current = res.state
       setItems(res.items)
       if (res.items.length === 0) setExhausted(true)
+      void updateGatePill(res.gateStage)
       dwellStartRef.current = Date.now()
     }
     init()
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Current-item tracking (dwell + implicit up-swipe + infinite append) ──────
@@ -180,13 +220,20 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
       ...stateRef.current,
       deepQueue: [...fresh, ...stateRef.current.deepQueue.filter((d) => !fresh.includes(d))].slice(0, 16),
     }
-    const res = await nextFeedBatch(stateRef.current, PAGE_BATCH)
+    const res = await nextFeedBatch(
+      stateRef.current,
+      PAGE_BATCH,
+      undefined,
+      undefined,
+      useSettings.getState().prefs,
+    )
     stateRef.current = res.state
     if (res.items.length) {
       setExhausted(false)
       setItems((prev) => [...prev, ...res.items])
     }
-  }, [])
+    void updateGatePill(res.gateStage)
+  }, [updateGatePill])
 
   const handleInterest = useCallback(
     (index: number, item: FeedItem, direction: SwipeInterest) => {
@@ -277,6 +324,18 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
         {/* Spacer to keep Today centred */}
         <div className="w-8" />
       </div>
+
+      {/* Knowledge-level gate pill — "you are on foundations" while the gate is
+          at stage 1, and a one-shot "deeper waters" moment when it rises. */}
+      {gatePill && (
+        <div className="pointer-events-none absolute left-1/2 top-12 z-10 -translate-x-1/2">
+          <div className="rounded-full border border-accent/20 bg-bg/90 px-3.5 py-1.5 text-[11px] text-accent shadow-card backdrop-blur-sm">
+            {gatePill === 'foundations'
+              ? 'Foundations first'
+              : 'Deeper waters unlocked - your map grows.'}
+          </div>
+        </div>
+      )}
 
       {/* Deepen-on-demand indicator — the graph is growing toward what you asked for */}
       {deepening && (

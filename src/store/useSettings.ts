@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { db } from '../db/schema'
-import { DEFAULT_PREFS, type Prefs } from '../lib/settings'
+import { DEFAULT_PREFS, sanitizeKnowledgeLevel, type Prefs } from '../lib/settings'
 
 const PREFS_KEY = 'prefs'
 
@@ -17,7 +17,9 @@ export const useSettings = create<SettingsState>((set, get) => ({
   load: async () => {
     const row = await db.settings.get(PREFS_KEY)
     const stored = (row?.value as Partial<Prefs> | undefined) ?? {}
-    set({ prefs: { ...DEFAULT_PREFS, ...stored }, loaded: true })
+    const merged = { ...DEFAULT_PREFS, ...stored }
+    merged.knowledgeLevel = sanitizeKnowledgeLevel(merged.knowledgeLevel)
+    set({ prefs: merged, loaded: true })
   },
   update: async (patch) => {
     const next = { ...get().prefs, ...patch }

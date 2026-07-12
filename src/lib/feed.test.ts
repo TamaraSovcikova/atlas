@@ -3,6 +3,7 @@ import type { Concept, Domain } from '../db/schema'
 import {
   applySwipeToWeights,
   assembleBatch,
+  buildSpinePool,
   emptyWeights,
   freshFeedState,
   interestScore,
@@ -177,5 +178,139 @@ describe('assembleBatch', () => {
     const { items } = assembleBatch(pools, freshFeedState(emptyWeights(0)), 6, mulberry32(9))
     const ids = items.map((it) => primaryConcept(it).id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+// ── Knowledge-level soft gate (§4b) ──────────────────────────────────────────
+
+describe('knowledge-level soft gate', () => {
+  const DOMAINS: Domain[] = ['history', 'science', 'culture', 'geography', 'politics']
+  const mixedSpine = (n: number, prefix = 'n') =>
+    Array.from({ length: n }, (_, i) => makeConcept(`${prefix}${i}`, DOMAINS[i % DOMAINS.length]!))
+
+  /** Run `batches` sequential batches on ONE rng stream, chaining state. */
+  function runChained(pools: FeedPools, seed: number, batches = 3, perBatch = 3) {
+    const rng = mulberry32(seed)
+    let state = freshFeedState(emptyWeights(0))
+    const keys: string[] = []
+    for (let b = 0; b < batches; b++) {
+      const res = assembleBatch(pools, state, perBatch, rng)
+      state = res.state
+      keys.push(...res.items.map((it) => it.key))
+    }
+    return { keys, state }
+  }
+
+  it("REGRESSION ('some' bit-identity): absent gate and non-finite gate produce " +
+     'identical items AND state across chained batches, many seeds', () => {
+    const spine = mixedSpine(12)
+    const ungated = emptyPools({ spine })
+    const infiniteGate = emptyPools({
+      spine,
+      gate: { ceiling: Infinity, complexityById: new Map() },
+    })
+    for (let seed = 0; seed < 20; seed++) {
+      const a = runChained(ungated, seed)
+      const b = runChained(infiniteGate, seed)
+      // Identical picks in identical order ⇒ the coin was never drawn on the
+      // ungated path (an unconditional rng() would shift every later pick).
+      expect(b.keys).toEqual(a.keys)
+      expect([...b.state.shownConceptIds].sort()).toEqual([...a.state.shownConceptIds].sort())
+      expect(b.state.recentDomains).toEqual(a.state.recentDomains)
+    }
+  })
+
+  it('gated picks consume exactly one extra rng draw per discovery pick', () => {
+    const spine = mixedSpine(12)
+    const complexityById = new Map(spine.map((c) => [c.id, 1]))
+    const count = (pools: FeedPools) => {
+      let draws = 0
+      const rng = mulberry32(5)
+      const counting = () => {
+        draws++
+        return rng()
+      }
+      assembleBatch(pools, freshFeedState(emptyWeights(0)), 4, counting)
+      return draws
+    }
+    const base = count(emptyPools({ spine }))
+    const gated = count(emptyPools({ spine, gate: { ceiling: 1, complexityById } }))
+    expect(gated).toBe(base + 4) // one coin per pick, everything within-ceiling
+  })
+
+  it('foundations dominate ~WITHIN_BIAS of picks but deep cards still arrive', () => {
+    // 5 within-ceiling + 5 beyond, equal weights. Expected within share is
+    // ≈ 0.8 + 0.2·(within share of the full pool) ≈ 0.9.
+    const within = mixedSpine(5, 'w')
+    const beyond = mixedSpine(5, 'd')
+    const complexityById = new Map<string, number>([
+      ...within.map((c): [string, number] => [c.id, 1]),
+      ...beyond.map((c): [string, number] => [c.id, 3]),
+    ])
+    const pools = emptyPools({
+      spine: [...within, ...beyond],
+      gate: { ceiling: 1, complexityById },
+    })
+    const rng = mulberry32(1234)
+    let withinCount = 0
+    const N = 2000
+    for (let i = 0; i < N; i++) {
+      const { items } = assembleBatch(pools, freshFeedState(emptyWeights(0)), 1, rng)
+      if (items[0]!.key.includes(':w')) withinCount++
+    }
+    const frac = withinCount / N
+    expect(frac).toBeGreaterThan(0.8)
+    expect(frac).toBeLessThan(0.97)
+    expect(N - withinCount).toBeGreaterThan(0) // never a hard filter
+  })
+
+  it('spills to the full pool when nothing within-ceiling remains (fresh-install path)', () => {
+    const spine = mixedSpine(6)
+    const complexityById = new Map(spine.map((c) => [c.id, 3]))
+    const pools = emptyPools({ spine, gate: { ceiling: 1, complexityById } })
+    const { items } = assembleBatch(pools, freshFeedState(emptyWeights(0)), 3, mulberry32(2))
+    expect(items).toHaveLength(3) // a dead feed is worse than a deep card
+  })
+
+  it('no duplicates when the gate flips between batches (level flap)', () => {
+    const spine = mixedSpine(10)
+    const complexityById = new Map(spine.map((c, i) => [c.id, i % 2 === 0 ? 1 : 3]))
+    const rng = mulberry32(77)
+    const gated = emptyPools({ spine, gate: { ceiling: 1, complexityById } })
+    const first = assembleBatch(gated, freshFeedState(emptyWeights(0)), 4, rng)
+    const second = assembleBatch(emptyPools({ spine }), first.state, 4, rng)
+    const keys = [...first.items, ...second.items].map((it) => it.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+})
+
+describe('buildSpinePool', () => {
+  const thread = {
+    members: [
+      { conceptId: 'deep', tier: 2 },
+      { conceptId: 'anchor', tier: 1 },
+    ],
+  }
+  const anchor = makeConcept('anchor', 'history')
+  const deep = makeConcept('deep', 'science', { approxYear: 100 })
+  const conceptById = new Map([
+    ['anchor', anchor],
+    ['deep', deep],
+  ])
+
+  it("'some': locked tiers enter via the chrono net (order: unlocked first)", () => {
+    const pool = buildSpinePool([thread], [anchor, deep], conceptById, new Map(), 'some')
+    expect(pool.map((c) => c.id)).toEqual(['anchor', 'deep'])
+  })
+
+  it("default level is 'some' (identity)", () => {
+    const explicit = buildSpinePool([thread], [anchor, deep], conceptById, new Map(), 'some')
+    const implicit = buildSpinePool([thread], [anchor, deep], conceptById, new Map())
+    expect(implicit).toEqual(explicit)
+  })
+
+  it("'confident' serves the thread's own order — tier 2 may lead", () => {
+    const pool = buildSpinePool([thread], [anchor, deep], conceptById, new Map(), 'confident')
+    expect(pool.map((c) => c.id)).toEqual(['deep', 'anchor'])
   })
 })

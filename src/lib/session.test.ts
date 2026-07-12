@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { interleave, computeUnlockedTiers, TIER_REPS_GATE, type RecallItem } from './session'
+import { interleave, computeUnlockedTiers, unlockedTiersFor, TIER_REPS_GATE, type RecallItem } from './session'
 import type { Concept, Lesson, Review } from '../db/schema'
 import { newReview } from './fsrs'
 
@@ -122,5 +122,18 @@ describe('computeUnlockedTiers', () => {
     const concepts = new Map([['a1', concept('a1', true)], ['a2', concept('a2', true)]])
     const reviews = new Map([['a1', review('a1', TIER_REPS_GATE)], ['a2', review('a2', TIER_REPS_GATE)]])
     expect(computeUnlockedTiers(members, concepts, reviews).has(2)).toBe(true)
+  })
+
+  describe('unlockedTiersFor (knowledge level, §4b)', () => {
+    it("'confident' opens every tier the thread has, regardless of progress", () => {
+      const deep = [...members, { conceptId: 'c1', tier: 3 }]
+      const unlocked = unlockedTiersFor('confident', deep, new Map(), new Map())
+      expect([...unlocked].sort()).toEqual([1, 2, 3])
+    })
+
+    it("'some' and 'new' keep the reps-based pacing gate", () => {
+      expect(unlockedTiersFor('some', members, new Map(), new Map()).has(2)).toBe(false)
+      expect(unlockedTiersFor('new', members, new Map(), new Map()).has(2)).toBe(false)
+    })
   })
 })

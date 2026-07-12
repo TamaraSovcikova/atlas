@@ -2,6 +2,11 @@ import { useState } from 'react'
 import { M, AnimatePresence } from './ui/motion'
 import { Button } from './ui/Button'
 import { db } from '../db/schema'
+import {
+  KNOWLEDGE_LEVELS,
+  KNOWLEDGE_LEVEL_LABEL,
+  type KnowledgeLevel,
+} from '../lib/settings'
 
 interface Props {
   onDone: () => void
@@ -26,10 +31,13 @@ interface InfoSlide {
   title: string
   body: string
 }
+interface LevelSlide {
+  kind: 'level'
+}
 interface InterestSlide {
   kind: 'interest'
 }
-type Slide = InfoSlide | InterestSlide
+type Slide = InfoSlide | LevelSlide | InterestSlide
 
 const SLIDES: Slide[] = [
   {
@@ -50,18 +58,14 @@ const SLIDES: Slide[] = [
     title: 'Follow the pathway',
     body: 'Each day is one composed session: due reviews plus a little new material from your current story. Finish a story to unlock the next, then come back tomorrow.',
   },
+  { kind: 'level' },
   { kind: 'interest' },
 ]
-
-async function saveInterestEras(selected: string[]) {
-  const row = await db.settings.get('prefs')
-  const existing = (row?.value as Record<string, unknown>) ?? {}
-  await db.settings.put({ key: 'prefs', value: { ...existing, interestEras: selected } })
-}
 
 export function Onboarding({ onDone }: Props) {
   const [i, setI] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [level, setLevel] = useState<KnowledgeLevel | null>(null)
   const slide = SLIDES[i]!
   const last = i === SLIDES.length - 1
 
@@ -74,9 +78,25 @@ export function Onboarding({ onDone }: Props) {
     })
   }
 
+  // One write for everything the flow collected, used by Begin AND Skip so a
+  // level tapped before skipping is never discarded. An unanswered level is
+  // simply omitted (DEFAULT_PREFS supplies 'some'). A rejected put (private
+  // browsing, storage quota) must never strand the user on the last slide.
+  async function persist() {
+    try {
+      const row = await db.settings.get('prefs')
+      const existing = (row?.value as Record<string, unknown>) ?? {}
+      const next: Record<string, unknown> = { ...existing, interestEras: [...selected] }
+      if (level) next.knowledgeLevel = level
+      await db.settings.put({ key: 'prefs', value: next })
+    } catch (err) {
+      console.warn('onboarding: could not save preferences, continuing with defaults', err)
+    }
+  }
+
   async function handleNext() {
     if (last) {
-      await saveInterestEras([...selected])
+      await persist()
       onDone()
     } else {
       setI(i + 1)
@@ -99,6 +119,56 @@ export function Onboarding({ onDone }: Props) {
               <div className="text-4xl">{slide.glyph}</div>
               <h2 className="mt-4 font-serif text-2xl text-ink">{slide.title}</h2>
               <p className="mt-3 text-sm leading-relaxed text-ink-soft">{slide.body}</p>
+            </M.div>
+          ) : slide.kind === 'level' ? (
+            <M.div
+              key="level"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14 }}
+              transition={{ duration: 0.3 }}
+              className="surface p-6"
+            >
+              <div className="text-center">
+                <div className="text-3xl">🧭</div>
+                <h2 className="mt-3 font-serif text-xl text-ink">
+                  How much do you already know?
+                </h2>
+                <p className="mt-2 text-sm text-ink-softer">Atlas will pace new material to match.</p>
+              </div>
+              <div className="mt-5 space-y-2" role="radiogroup" aria-label="Knowledge level">
+                {KNOWLEDGE_LEVELS.map((key) => {
+                  const active = level === key
+                  const label = KNOWLEDGE_LEVEL_LABEL[key]
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setLevel(key)}
+                      className={`w-full rounded-2xl border p-4 text-left transition-colors active:scale-[0.99] ${
+                        active
+                          ? 'border-accent/70 bg-accent/10'
+                          : 'border-ink/[0.08] bg-bg-soft/60 hover:border-accent/40'
+                      }`}
+                    >
+                      <p className={`text-sm font-medium ${active ? 'text-accent' : 'text-ink'}`}>
+                        {label.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink-softer">{label.blurb}</p>
+                    </button>
+                  )
+                })}
+              </div>
+              {level === null && (
+                <p className="mt-3 text-center text-[11px] text-ink-softer">
+                  Not sure? Atlas starts balanced and adjusts as you go.
+                </p>
+              )}
+              <p className="mt-1.5 text-center text-[11px] text-ink-softer">
+                You can change this anytime in Settings.
+              </p>
             </M.div>
           ) : (
             <M.div
@@ -163,7 +233,7 @@ export function Onboarding({ onDone }: Props) {
         <button
           type="button"
           onClick={async () => {
-            await saveInterestEras([...selected])
+            await persist()
             onDone()
           }}
           className="text-sm text-ink-softer transition-colors hover:text-ink"

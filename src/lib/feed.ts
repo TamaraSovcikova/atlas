@@ -7,7 +7,15 @@ import {
   type SwipeDirection,
 } from '../db/schema'
 import { connectionsFor } from './connections'
-import { computeUnlockedTiers } from './session'
+import { unlockedTiersFor } from './session'
+import {
+  WITHIN_BIAS,
+  buildComplexityMap,
+  complexityCeiling,
+  computeAnchorsMet,
+  conceptComplexity,
+} from './gating'
+import type { KnowledgeLevel, Prefs } from './settings'
 
 /**
  * The infinite-feed recommender. Calm-personalized: swipe gestures nudge
@@ -179,6 +187,13 @@ export interface FeedPools {
   connections: { from: Concept; to: Concept; relation: RelationType }[]
   /** Lookup for resolving deep-queue ids. */
   conceptById: Map<string, Concept>
+  /**
+   * Knowledge-level soft gate (§4b). Present ONLY when a finite complexity
+   * ceiling applies ('new' level, ceiling 1-2). When absent, takeDiscovery
+   * MUST run today's exact codepath — including its rng call sequence — so
+   * 'some'/'confident'/legacy behaviour stays bit-identical.
+   */
+  gate?: { ceiling: number; complexityById: Map<string, number> }
 }
 
 export interface FeedState {
@@ -289,7 +304,25 @@ function takeDiscovery(pools: FeedPools, state: FeedState, rng: Rng): FeedItem |
   }
 
   // 2. New concept from the Spine, reranked by interest + exploration.
-  const spinePool = pools.spine.filter((c) => !state.shownConceptIds.has(c.id))
+  //
+  //    Knowledge-level soft gate (§4b): when a finite ceiling applies, an
+  //    80/20 coin restricts the candidate pool to within-ceiling concepts
+  //    most of the time — foundations dominate, deep cards stay possible.
+  //
+  //      spinePool ──gate?──▶ within = cx(id) ≤ ceiling
+  //         │                   │ non-empty & rng() < WITHIN_BIAS → within
+  //         │                   └ else (spill / 20%)              → full pool
+  //         └─ no gate: full pool, NO coin drawn — the ungated rng call
+  //            sequence must stay byte-identical to the pre-gate app.
+  //
+  let spinePool = pools.spine.filter((c) => !state.shownConceptIds.has(c.id))
+  const gate = pools.gate
+  if (gate && Number.isFinite(gate.ceiling)) {
+    const within = spinePool.filter(
+      (c) => conceptComplexity(c.id, gate.complexityById) <= gate.ceiling,
+    )
+    if (within.length > 0 && rng() < WITHIN_BIAS) spinePool = within
+  }
   const picked = pickDiscovery(spinePool, state.weights, state.recentDomains, rng)
   if (picked) {
     state.shownConceptIds.add(picked.id)
@@ -323,27 +356,23 @@ async function saveInterest(w: InterestWeights): Promise<void> {
   await db.settings.put({ key: INTEREST_KEY, value: w })
 }
 
-/** Gather the live pools, then assemble. Threads/tiers mirror the daily Spine. */
-export async function gatherPools(now = Date.now()): Promise<FeedPools> {
-  const allConcepts = await db.concepts.toArray()
-  const conceptById = new Map(allConcepts.map((c) => [c.id, c]))
-  const allReviews = await db.reviews.toArray()
-  const reviewByConcept = new Map<string, Review>(allReviews.map((r) => [r.conceptId, r]))
-
-  // Due reviews: met concepts only, soonest-due first.
-  const dueReviews = allReviews
-    .filter((r) => r.dueAt <= now)
-    .sort((a, b) => a.dueAt - b.dueAt)
-    .map((r) => conceptById.get(r.conceptId))
-    .filter((c): c is Concept => !!c && c.firstSeenAt !== null)
-
-  // Spine: unseen concepts whose tier is unlocked, in pathway order, then any
-  // remaining unseen chronologically as a safety net.
-  const threads = await db.threads.orderBy('displayOrder').toArray()
+/**
+ * Build the ordered discovery pool: unseen concepts whose tier is unlocked,
+ * in pathway order, then any remaining unseen chronologically as a safety
+ * net. Pure (no DB) so the 'some'-identity proof covers pool construction,
+ * not just batch assembly.
+ */
+export function buildSpinePool(
+  threads: { members: { conceptId: string; tier: number }[] }[],
+  allConcepts: Concept[],
+  conceptById: Map<string, Concept>,
+  reviewByConcept: Map<string, Review>,
+  level: KnowledgeLevel = 'some',
+): Concept[] {
   const spine: Concept[] = []
   const inSpine = new Set<string>()
   for (const thread of threads) {
-    const unlocked = computeUnlockedTiers(thread.members, conceptById, reviewByConcept)
+    const unlocked = unlockedTiersFor(level, thread.members, conceptById, reviewByConcept)
     const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
     const ordered = thread.members
       .map((m) => conceptById.get(m.conceptId))
@@ -360,6 +389,39 @@ export async function gatherPools(now = Date.now()): Promise<FeedPools> {
     .filter((c) => c.firstSeenAt === null && !inSpine.has(c.id))
     .sort((a, b) => (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity))
   for (const c of chrono) spine.push(c)
+  return spine
+}
+
+/** Gather the live pools, then assemble. Threads/tiers mirror the daily Spine. */
+export async function gatherPools(now = Date.now(), prefs?: Prefs): Promise<FeedPools> {
+  const allConcepts = await db.concepts.toArray()
+  const conceptById = new Map(allConcepts.map((c) => [c.id, c]))
+  const allReviews = await db.reviews.toArray()
+  const reviewByConcept = new Map<string, Review>(allReviews.map((r) => [r.conceptId, r]))
+
+  // Due reviews: met concepts only, soonest-due first.
+  const dueReviews = allReviews
+    .filter((r) => r.dueAt <= now)
+    .sort((a, b) => a.dueAt - b.dueAt)
+    .map((r) => conceptById.get(r.conceptId))
+    .filter((c): c is Concept => !!c && c.firstSeenAt !== null)
+
+  const threads = await db.threads.orderBy('displayOrder').toArray()
+  const level = prefs?.knowledgeLevel ?? 'some'
+  const spine = buildSpinePool(threads, allConcepts, conceptById, reviewByConcept, level)
+
+  // Knowledge-level soft gate (§4b): attach only when a finite ceiling
+  // applies, so the ungated assembly path stays bit-identical.
+  let gate: FeedPools['gate']
+  if (level === 'new') {
+    const ceiling = complexityCeiling(
+      'new',
+      computeAnchorsMet(threads, conceptById, reviewByConcept),
+    )
+    if (Number.isFinite(ceiling)) {
+      gate = { ceiling, complexityById: buildComplexityMap(threads) }
+    }
+  }
 
   // Connections among met concepts.
   const metIds = new Set(allConcepts.filter((c) => c.firstSeenAt !== null).map((c) => c.id))
@@ -377,18 +439,50 @@ export async function gatherPools(now = Date.now()): Promise<FeedPools> {
     connections.push({ from, to, relation: e.relation })
   }
 
-  return { dueReviews, spine, connections, conceptById }
+  const pools: FeedPools = { dueReviews, spine, connections, conceptById }
+  if (gate) pools.gate = gate
+  return pools
 }
 
-/** Produce the next batch of feed items, advancing state in place. */
+/**
+ * Produce the next batch of feed items, advancing state in place. When prefs
+ * are provided the knowledge-level gate applies; `gateStage` reports the
+ * user-facing stage (1 foundations · 2 mid · 3 open) for 'new'-level users,
+ * null otherwise — FeedView uses it for the gate pill + unlock moment.
+ */
 export async function nextFeedBatch(
   state: FeedState,
   count: number,
   rng: Rng = Math.random,
   now = Date.now(),
-): Promise<{ items: FeedItem[]; state: FeedState }> {
-  const pools = await gatherPools(now)
-  return assembleBatch(pools, state, count, rng)
+  prefs?: Prefs,
+): Promise<{ items: FeedItem[]; state: FeedState; gateStage: 1 | 2 | 3 | null }> {
+  const pools = await gatherPools(now, prefs)
+  const batch = assembleBatch(pools, state, count, rng)
+  let stage: 1 | 2 | 3 | null = null
+  if (prefs?.knowledgeLevel === 'new') {
+    if (pools.gate) {
+      stage = pools.gate.ceiling === 1 ? 1 : 2
+    } else {
+      stage = 3
+    }
+  }
+  return { ...batch, gateStage: stage }
+}
+
+// ── Gate pill acknowledgment (one-shot "deeper waters" moment) ──────────────
+
+const CEILING_ACK_KEY = 'gate:ceilingAck'
+
+/** Highest gate stage the user has been shown an unlock moment for (default 1). */
+export async function loadCeilingAck(): Promise<number> {
+  const row = await db.settings.get(CEILING_ACK_KEY)
+  const v = row?.value
+  return typeof v === 'number' && v >= 1 ? v : 1
+}
+
+export async function saveCeilingAck(stage: number): Promise<void> {
+  await db.settings.put({ key: CEILING_ACK_KEY, value: stage })
 }
 
 /**

@@ -83,6 +83,10 @@ function App() {
 
   async function finishOnboarding() {
     await db.settings.put({ key: ONBOARDED_KEY, value: true })
+    // Onboarding writes prefs (interest eras, knowledge level) straight to the
+    // db; reload the store so the first feed/session sees them without a
+    // full app restart.
+    await loadSettings()
     setShowOnboarding(false)
   }
 

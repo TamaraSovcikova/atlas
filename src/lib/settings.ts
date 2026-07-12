@@ -1,6 +1,21 @@
 export type Intensity = 'playful' | 'balanced' | 'serious'
 export type Theme = 'dark' | 'light'
 
+/**
+ * Self-reported starting depth, chosen at onboarding and changeable in
+ * Settings. 'some' is the default and MUST behave exactly like the app did
+ * before knowledge levels existed; 'new' applies a soft prefer-foundations
+ * bias to new-concept introduction; 'confident' unlocks all thread tiers.
+ */
+export type KnowledgeLevel = 'new' | 'some' | 'confident'
+
+export const KNOWLEDGE_LEVELS: KnowledgeLevel[] = ['new', 'some', 'confident']
+
+/** Corrupt/foreign stored values (old backups, hand-edited kv) fall back to 'some'. */
+export function sanitizeKnowledgeLevel(v: unknown): KnowledgeLevel {
+  return KNOWLEDGE_LEVELS.includes(v as KnowledgeLevel) ? (v as KnowledgeLevel) : 'some'
+}
+
 export interface Prefs {
   intensity: Intensity
   // Overrides. minimiseTyping forces tap-only recall regardless of intensity.
@@ -30,6 +45,8 @@ export interface Prefs {
   speechRate: number
   /** Era IDs the user flagged as interesting during onboarding. Biases new-concept selection. */
   interestEras: string[]
+  /** Self-reported starting depth; gates how deep new-concept introduction starts. */
+  knowledgeLevel: KnowledgeLevel
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -52,6 +69,22 @@ export const DEFAULT_PREFS: Prefs = {
   listenMode: false,
   speechRate: 1.0,
   interestEras: [],
+  knowledgeLevel: 'some',
+}
+
+export const KNOWLEDGE_LEVEL_LABEL: Record<KnowledgeLevel, { title: string; blurb: string }> = {
+  new: {
+    title: 'Just starting out',
+    blurb: 'Foundations first. Depth unlocks as you go.',
+  },
+  some: {
+    title: 'I know some history',
+    blurb: 'A balanced mix from day one.',
+  },
+  confident: {
+    title: 'I know it well',
+    blurb: 'Open everything from day one.',
+  },
 }
 
 export const MAX_STREAK_FREEZES = 5

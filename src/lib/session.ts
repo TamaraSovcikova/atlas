@@ -8,8 +8,17 @@ import {
   type SessionShape,
 } from '../db/schema'
 import { shouldShowMcqFallback } from './fsrs'
-import { resolvePolicy, type Policy, type Prefs } from './settings'
+import { resolvePolicy, sanitizeKnowledgeLevel, type KnowledgeLevel, type Policy, type Prefs } from './settings'
 import { masteryOf, masterySpread, type MasteryLevel } from './mastery'
+import {
+  TIER_REPS_GATE,
+  buildComplexityMap,
+  complexityCeiling,
+  computeAnchorsMet,
+  orderByCeiling,
+} from './gating'
+
+export { TIER_REPS_GATE }
 
 export interface RecallItem {
   kind: 'recall'
@@ -877,10 +886,23 @@ export async function buildDailySession(
       ),
     ]
   }
-  const newItems: RecallItem[] = []
+  // Knowledge-level gate (§4b): 'new' users get a SOFT prefer-foundations
+  // ordering (within-ceiling concepts fill first, deeper ones spill in only
+  // when foundations run out); 'confident' unlocks all tiers; 'some' is
+  // bit-identical to the ungated app (the candidate order below is exactly
+  // the old per-thread selection order, so taking the first maxNew items
+  // reproduces the old behaviour item for item).
+  const level = prefs.knowledgeLevel ?? 'some'
+  const complexityById = buildComplexityMap(threads)
+  const ceiling =
+    level === 'new'
+      ? complexityCeiling('new', computeAnchorsMet(threads, conceptById, reviewByConcept))
+      : Infinity
+
+  const candidates: Concept[] = []
+  const inCandidates = new Set<string>()
   for (const thread of threads) {
-    if (newItems.length >= maxNew) break
-    const unlocked = computeUnlockedTiers(thread.members, conceptById, reviewByConcept)
+    const unlocked = unlockedTiersFor(level, thread.members, conceptById, reviewByConcept)
     const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
     const fresh = thread.members
       .map((m) => conceptById.get(m.conceptId))
@@ -889,6 +911,7 @@ export async function buildDailySession(
           !!c &&
           c.firstSeenAt === null &&
           !usedIds.has(c.id) &&
+          !inCandidates.has(c.id) &&
           unlocked.has(tierByConcept.get(c.id) ?? 1),
       )
       .sort((a, b) => {
@@ -897,15 +920,21 @@ export async function buildDailySession(
         if (ta !== tb) return ta - tb
         return (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity)
       })
-    for (const concept of fresh) {
-      if (newItems.length >= maxNew) break
-      const review = reviewByConcept.get(concept.id)
-      if (!review) continue
-      const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
-      if (item) {
-        newItems.push(item)
-        usedIds.add(concept.id)
-      }
+    for (const c of fresh) {
+      inCandidates.add(c.id)
+      candidates.push(c)
+    }
+  }
+
+  const newItems: RecallItem[] = []
+  for (const concept of orderByCeiling(candidates, complexityById, ceiling)) {
+    if (newItems.length >= maxNew) break
+    const review = reviewByConcept.get(concept.id)
+    if (!review) continue
+    const item = await makeRecallItem(concept, review, true, policy, 'new', rot++)
+    if (item) {
+      newItems.push(item)
+      usedIds.add(concept.id)
     }
   }
 
@@ -919,7 +948,7 @@ export async function buildDailySession(
     const chrono = allConcepts
       .filter((c) => c.firstSeenAt === null && !usedIds.has(c.id))
       .sort((a, b) => (a.approxYear ?? Infinity) - (b.approxYear ?? Infinity))
-    for (const concept of chrono) {
+    for (const concept of orderByCeiling(chrono, complexityById, ceiling)) {
       if (newItems.length >= maxNew) break
       const review = reviewByConcept.get(concept.id)
       if (!review) continue
@@ -973,7 +1002,12 @@ export async function buildThreadSession(
   // extra round-trips. This includes non-due reviews (stability check).
   const allMemberReviews = await db.reviews.where('conceptId').anyOf(memberIds).toArray()
   const allReviewByConcept = new Map(allMemberReviews.map((r) => [r.conceptId, r]))
-  const unlockedTiers = computeUnlockedTiers(thread.members, byId, allReviewByConcept)
+  const unlockedTiers = unlockedTiersFor(
+    prefs.knowledgeLevel ?? 'some',
+    thread.members,
+    byId,
+    allReviewByConcept,
+  )
 
   const recall: RecallItem[] = []
   let rot = 0
@@ -1019,9 +1053,6 @@ export async function buildThreadSession(
   return countPlan(items, 'thread', null, null, threadId)
 }
 
-/** Minimum FSRS reps a tier must reach before the next tier unlocks (soft pacing). */
-export const TIER_REPS_GATE = 2
-
 /**
  * Compute which tiers are unlocked for a thread given the current concept and
  * review state. Tier 1 is always unlocked; tier N+1 unlocks once every tier-N
@@ -1059,6 +1090,30 @@ export function computeUnlockedTiers(
   return unlocked
 }
 
+/**
+ * Tier unlocks with the knowledge level applied: 'confident' opens every tier
+ * a thread has ("Open everything from day one" — used by the feed, the daily
+ * Spine, thread sessions, and the pathway summaries alike, so lock badges
+ * never disagree with what the feed serves). Other levels keep the normal
+ * reps-based pacing gate.
+ */
+export function unlockedTiersFor(
+  level: KnowledgeLevel,
+  members: { conceptId: string; tier: number }[],
+  conceptById: Map<string, Concept>,
+  reviewByConcept: Map<string, Review>,
+): Set<number> {
+  if (level === 'confident') return new Set(members.map((m) => m.tier))
+  return computeUnlockedTiers(members, conceptById, reviewByConcept)
+}
+
+/** The stored knowledge level, for db-bound helpers that don't receive prefs. */
+async function loadKnowledgeLevel(): Promise<KnowledgeLevel> {
+  const row = await db.settings.get('prefs')
+  const stored = (row?.value as Partial<Prefs> | undefined) ?? {}
+  return sanitizeKnowledgeLevel(stored.knowledgeLevel)
+}
+
 export interface ThreadSummary {
   threadId: string
   name: string
@@ -1075,6 +1130,7 @@ export interface ThreadSummary {
 
 export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[]> {
   const threads = await db.threads.orderBy('displayOrder').toArray()
+  const level = await loadKnowledgeLevel()
   const reviewByConcept = new Map<string, Review>()
   for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
   const conceptById = new Map<string, Concept>()
@@ -1093,7 +1149,7 @@ export async function summariseThreads(now = Date.now()): Promise<ThreadSummary[
   }
 
   return threads.map((t) => {
-    const unlockedTiers = computeUnlockedTiers(t.members, conceptById, reviewByConcept)
+    const unlockedTiers = unlockedTiersFor(level, t.members, conceptById, reviewByConcept)
     const summary: ThreadSummary = {
       threadId: t.id,
       name: t.name,
@@ -1145,13 +1201,14 @@ export async function getNextPathwayConcept(): Promise<{
   threadName: string
 } | null> {
   const threads = await db.threads.orderBy('displayOrder').toArray()
+  const level = await loadKnowledgeLevel()
   const reviewByConcept = new Map<string, Review>()
   for (const r of await db.reviews.toArray()) reviewByConcept.set(r.conceptId, r)
   const conceptById = new Map<string, Concept>()
   for (const c of await db.concepts.toArray()) conceptById.set(c.id, c)
 
   for (const thread of threads) {
-    const unlocked = computeUnlockedTiers(thread.members, conceptById, reviewByConcept)
+    const unlocked = unlockedTiersFor(level, thread.members, conceptById, reviewByConcept)
     const tierByConcept = new Map(thread.members.map((m) => [m.conceptId, m.tier]))
     for (const member of thread.members) {
       const concept = conceptById.get(member.conceptId)
