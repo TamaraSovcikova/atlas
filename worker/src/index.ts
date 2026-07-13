@@ -72,10 +72,6 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-function redirect(url: string, status = 302): Response {
-  return new Response(null, { status, headers: { Location: url, ...CORS } })
-}
-
 function bearer(req: Request): string | null {
   const h = req.headers.get('Authorization') ?? ''
   const m = /^Bearer\s+(.+)$/i.exec(h.trim())
@@ -185,7 +181,11 @@ async function handleGoogleStart(req: Request, env: Env): Promise<Response> {
     access_type: 'offline',
     prompt: 'select_account',
   })
-  return redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
+  // Return the Google auth URL as JSON so the client can window.open() it in a
+  // popup. Do NOT 302 here: the client fetches this endpoint, and fetch would
+  // follow the redirect cross-origin to Google, whose response has no CORS for
+  // the app origin -> the browser reports an opaque "failed to fetch".
+  return json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` })
 }
 
 async function handleGoogleCallback(req: Request, env: Env): Promise<Response> {
