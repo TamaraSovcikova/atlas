@@ -80,6 +80,11 @@
     --ink: 34 29 22;             /* ink #221D16 */
     --ink-soft: 80 68 54;        /* warm medium */
     --ink-softer: 140 124 106;   /* warm soft */
+    /* The one saturated accent (deep blue #28486B), as RGB channels so inline
+       `rgb(var(--accent) / x)` works. Theme-independent (matches tailwind accent);
+       the dark theme does not override it. Without this, every var(--accent)
+       inline colour resolved to transparent (the heatmap bug). */
+    --accent: 40 72 107;
     --bloom: rgba(40, 72, 107, 0.05);
     --grain-opacity: 0.2;
     --shadow-card: 0 1px 2px rgba(34,29,22,0.04), 0 4px 16px -6px rgba(34,29,22,0.12);

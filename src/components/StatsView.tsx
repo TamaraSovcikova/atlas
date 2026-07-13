@@ -118,19 +118,23 @@ export function StatsView() {
             <div key={ci} className="flex flex-col gap-1">
               {week.map((cell) => {
                 const future = cell.day > today
-                const intensity = cell.met ? 1 : cell.cards > 0 ? 0.45 : 0
+                // Graduated fill: empty is a clear light cell; activity scales the
+                // accent toward full at the daily goal, so a glance reads the streak.
+                const goal = Math.max(1, prefs.dailyGoalCards)
+                const frac = cell.cards <= 0 ? 0 : Math.min(1, cell.cards / goal)
+                const bg = future
+                  ? 'transparent'
+                  : cell.cards <= 0
+                    ? 'rgb(var(--ink) / 0.08)'
+                    : cell.met
+                      ? 'rgb(var(--accent) / 0.95)'
+                      : `rgb(var(--accent) / ${(0.4 + frac * 0.45).toFixed(2)})`
                 return (
                   <div
                     key={cell.day}
                     title={future ? '' : `${cell.cards} cards`}
                     className="h-3.5 w-3.5 rounded-[3px]"
-                    style={{
-                      backgroundColor: future
-                        ? 'transparent'
-                        : intensity === 0
-                          ? 'rgb(var(--ink) / 0.06)'
-                          : `rgb(var(--accent) / ${0.25 + intensity * 0.6})`,
-                    }}
+                    style={{ backgroundColor: bg }}
                   />
                 )
               })}

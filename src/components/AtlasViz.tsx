@@ -231,16 +231,16 @@ const BAND_HEADER = 48 // room for the era label at the top of a band
 const BAND_PAD_BOTTOM = 16
 const EMPTY_BAND = 60 // compact band for an era with no dated concepts
 
-/** Concepts are shown MET-first (the "lit stones" are the point), then chronological. */
+/**
+ * The river shows only concepts you've COVERED (met), chronological top-to-bottom.
+ * They appear here as you learn them (the data is a live query), so the timeline
+ * fills in over time rather than showing the whole bank up front.
+ */
 function orderForRiver(nodes: ConceptNode[]): ConceptNode[] {
-  return [...nodes]
-    .sort((a, b) => {
-      if (a.met !== b.met) return a.met ? -1 : 1
-      return a.year - b.year
-    })
-    .slice(0, MAX_NODES_PER_ERA)
-    // Within the shown set, present strictly chronologically top-to-bottom.
+  return nodes
+    .filter((n) => n.met)
     .sort((a, b) => a.year - b.year)
+    .slice(0, MAX_NODES_PER_ERA)
 }
 
 function TimeRiver({
@@ -258,7 +258,9 @@ function TimeRiver({
         {stats.map((s, i) => {
           const all = nodesByEra.get(s.era.id) ?? []
           const nodes = orderForRiver(all)
-          const extra = all.length - nodes.length
+          // "+N more" counts only COVERED concepts beyond the cap, not unmet ones.
+          const metCount = all.reduce((n, c) => n + (c.met ? 1 : 0), 0)
+          const extra = metCount - nodes.length
           // Each concept gets its own row, so nodes never stack on the same year.
           const bandH = nodes.length
             ? BAND_HEADER + nodes.length * NODE_ROW + BAND_PAD_BOTTOM
@@ -336,7 +338,7 @@ function TimeRiver({
               )}
               {nodes.length === 0 && (
                 <p className="absolute right-3 top-3 z-10 text-[10px] text-ink-softer">
-                  nothing dated here yet
+                  nothing covered here yet
                 </p>
               )}
             </div>

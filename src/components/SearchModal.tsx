@@ -109,12 +109,15 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
     setRabbitHoleId(res.concept.id)
   }
 
-  // A card ABOUT the query = a name match. Generation is offered whenever there's
-  // no such card, even if other cards mention the query — otherwise a person who
-  // only appears in others' summaries could never get their own card.
-  const hasNameMatch = concepts.length > 0
-  const hasOtherResults = mentions.length > 0 || collections.length > 0 || threads.length > 0
+  // A card ABOUT the query = a name match. But a name-SUBSTRING match isn't the
+  // same thing: searching "Stalin" matches "Stalin's Collectivisation" and "Battle
+  // of Stalingrad", neither of which is Stalin the person. So generation is offered
+  // whenever there's no EXACT-name card — prominently when nothing matches at all,
+  // and as a secondary option when only similar-named cards exist.
   const q = query.trim()
+  const hasNameMatch = concepts.length > 0
+  const hasExactMatch = concepts.some((c) => c.name.trim().toLowerCase() === q.toLowerCase())
+  const hasOtherResults = mentions.length > 0 || collections.length > 0 || threads.length > 0
 
   return (
     <>
@@ -138,7 +141,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !hasNameMatch && q.length >= 2) handleGenerate() }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !hasExactMatch && q.length >= 2) handleGenerate() }}
             placeholder="Search concepts, stories, collections…"
             className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-softer"
           />
@@ -231,6 +234,23 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
                       </li>
                     ))}
                   </ul>
+                  {!hasExactMatch && (
+                    <button
+                      type="button"
+                      disabled={generating}
+                      onClick={handleGenerate}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-accent/20 bg-accent/[0.04] px-4 py-2.5 text-xs text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
+                    >
+                      {generating ? (
+                        <span className="animate-pulse">Generating…</span>
+                      ) : (
+                        <>None of these? Generate a card for &ldquo;{q}&rdquo;</>
+                      )}
+                    </button>
+                  )}
+                  {!hasExactMatch && genError && (
+                    <p className="mt-2 rounded-xl bg-bg-softer px-3 py-2 text-xs text-ink-soft">{genError}</p>
+                  )}
                 </section>
               )}
 
