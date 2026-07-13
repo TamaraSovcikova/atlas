@@ -106,7 +106,10 @@ export async function signInWithGoogle(): Promise<AtlasUser> {
 
   // Step 2: open a popup and wait for the session token via postMessage
   return new Promise((resolve, reject) => {
-    const popup = window.open(url, 'atlas-signin', 'width=500,height=640,noopener')
+    // NOTE: no `noopener` — this OAuth popup must keep `window.opener` so the
+    // callback can postMessage the session back. `noopener` also makes
+    // window.open() return null, which falsely tripped "Popup blocked".
+    const popup = window.open(url, 'atlas-signin', 'width=500,height=640')
     if (!popup) {
       reject(new Error('Popup blocked. Allow popups for this site and try again.'))
       return
