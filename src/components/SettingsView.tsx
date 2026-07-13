@@ -29,6 +29,7 @@ import {
 } from '../lib/auth'
 import { getByokKey, setByokKey } from '../lib/ai'
 import { repullForLevel } from '../lib/community'
+import { MetricsPanel } from './MetricsPanel'
 
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 const THEMES: { key: Theme; label: string }[] = [
@@ -450,6 +451,15 @@ export function SettingsView({ canInstall, onInstall }: Props) {
           className="hidden"
         />
         {backupMsg && <p className="text-xs text-accent">{backupMsg}</p>}
+      </div>
+
+      {/* Insights (§E6) — local-only usage rollup */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-ink">Insights</h3>
+        <p className="text-xs text-ink-softer">
+          A private, on-device record of how you use Atlas — nothing here is ever sent anywhere.
+        </p>
+        <MetricsPanel />
       </div>
 
       {/* Account (Wave 3) */}

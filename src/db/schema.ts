@@ -198,6 +198,30 @@ export interface FeedEvent {
   at: number
 }
 
+/**
+ * Local-only daily metrics rollup (§E6). One row per day, incremented in place,
+ * so the founder can see whether the §4b gate is helping or starving without any
+ * server telemetry. Never leaves the device; excluded from sync payloads.
+ */
+export interface DayMetric {
+  /** Local date key, YYYY-MM-DD. */
+  day: string
+  /** Knowledge level active on this day (last write wins). */
+  level: string
+  /** App opens. */
+  opens: number
+  /** Feed concept/review cards scrolled into view. */
+  feedCards: number
+  /** Feed batches served at gate stage 1 / 2 / 3 (only meaningful for 'new'). */
+  gate1: number
+  gate2: number
+  gate3: number
+  /** AI concepts generated from search. */
+  generated: number
+  /** Deepen-on-demand invocations. */
+  deepened: number
+}
+
 export class AtlasDB extends Dexie {
   concepts!: Table<Concept, string>
   edges!: Table<Edge, number>
@@ -211,6 +235,7 @@ export class AtlasDB extends Dexie {
   collections!: Table<Collection, string>
   collectionConcepts!: Table<CollectionConcept, number>
   feedEvents!: Table<FeedEvent, number>
+  metrics!: Table<DayMetric, string>
 
   constructor() {
     super('atlas')
@@ -285,6 +310,22 @@ export class AtlasDB extends Dexie {
       collections: 'id, createdAt',
       collectionConcepts: '++id, collectionId, conceptId, [collectionId+conceptId]',
       feedEvents: '++id, at',
+    })
+    // v6 adds the local-only daily metrics rollup (§E6). Purely additive.
+    this.version(6).stores({
+      concepts: 'id, name, domain, approxYear, lastReviewedAt, *eras, *threads',
+      edges: '++id, fromId, toId, [fromId+toId], isPersonal',
+      lessons: 'id, conceptId',
+      reviews: '++id, conceptId, dueAt, state',
+      sessions: '++id, startedAt',
+      news: 'id, date, region',
+      settings: 'key',
+      eras: 'id, displayOrder',
+      threads: 'id, displayOrder',
+      collections: 'id, createdAt',
+      collectionConcepts: '++id, collectionId, conceptId, [collectionId+conceptId]',
+      feedEvents: '++id, at',
+      metrics: 'day',
     })
   }
 }

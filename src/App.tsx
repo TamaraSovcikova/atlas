@@ -4,6 +4,7 @@ import { db, type Domain, type Concept } from './db/schema'
 import { progressSnapshot } from './lib/progress'
 import { loadSeedIfNeeded } from './db/seed'
 import { pullCommunityConcepts } from './lib/community'
+import { bumpToday } from './lib/metrics'
 import { useSettings } from './store/useSettings'
 import { MotionProvider } from './components/ui/motion'
 import { BottomNav, type Tab } from './components/BottomNav'
@@ -75,6 +76,8 @@ function App() {
       // blocks first paint). New cards appear via live queries when they land.
       // Pass the reader's level so per-level variants (§E5) converge on their depth.
       pullCommunityConcepts(useSettings.getState().prefs.knowledgeLevel).catch(() => {})
+      // Local-only usage rollup (§E6): record the open + today's active level.
+      void bumpToday({ opens: 1, level: useSettings.getState().prefs.knowledgeLevel })
     }
     init()
     return () => {

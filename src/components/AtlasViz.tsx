@@ -225,8 +225,23 @@ function EraMap({ stats, onStartEra }: { stats: EraStat[]; onStartEra: (eraId: s
 
 // ── River of time ────────────────────────────────────────────────────────────
 
-const RIVER_BAND = 210
 const MAX_NODES_PER_ERA = 14
+const NODE_ROW = 34 // px of vertical space each concept gets — guarantees no overlap
+const BAND_HEADER = 48 // room for the era label at the top of a band
+const BAND_PAD_BOTTOM = 16
+const EMPTY_BAND = 60 // compact band for an era with no dated concepts
+
+/** Concepts are shown MET-first (the "lit stones" are the point), then chronological. */
+function orderForRiver(nodes: ConceptNode[]): ConceptNode[] {
+  return [...nodes]
+    .sort((a, b) => {
+      if (a.met !== b.met) return a.met ? -1 : 1
+      return a.year - b.year
+    })
+    .slice(0, MAX_NODES_PER_ERA)
+    // Within the shown set, present strictly chronologically top-to-bottom.
+    .sort((a, b) => a.year - b.year)
+}
 
 function TimeRiver({
   stats,
@@ -242,58 +257,87 @@ function TimeRiver({
       <div className="relative">
         {stats.map((s, i) => {
           const all = nodesByEra.get(s.era.id) ?? []
-          const nodes = all.slice(0, MAX_NODES_PER_ERA)
+          const nodes = orderForRiver(all)
           const extra = all.length - nodes.length
+          // Each concept gets its own row, so nodes never stack on the same year.
+          const bandH = nodes.length
+            ? BAND_HEADER + nodes.length * NODE_ROW + BAND_PAD_BOTTOM
+            : EMPTY_BAND
           return (
-            <div key={s.era.id} className="relative border-b border-ink/[0.06] last:border-0" style={{ minHeight: RIVER_BAND }}>
+            <div
+              key={s.era.id}
+              className="relative border-b border-ink/[0.06] last:border-0"
+              style={{ height: bandH }}
+            >
               {/* Era label */}
-              <div className="absolute left-3 top-3 z-10 max-w-[45%]">
+              <div className="absolute left-3 top-3 z-10">
                 <p className="font-serif text-sm text-ink">{s.era.name}</p>
                 <p className="text-[10px] text-ink-softer">
-                  {fmtRange(s.era.startYear, s.era.endYear)} · {s.met}/{s.total}
+                  {fmtRange(s.era.startYear, s.era.endYear)} · {s.met}/{s.total} met
                 </p>
               </div>
 
-              {/* The river segment */}
-              <svg viewBox={`0 0 100 ${RIVER_BAND}`} preserveAspectRatio="none" width="100%" style={{ height: RIVER_BAND }} className="absolute inset-0" aria-hidden="true">
+              {/* The river runs down the centre, brightening with how explored the era is */}
+              <svg
+                viewBox={`0 0 100 ${bandH}`}
+                preserveAspectRatio="none"
+                width="100%"
+                style={{ height: bandH }}
+                className="absolute inset-0"
+                aria-hidden="true"
+              >
                 <path
-                  d={riverPath(i)}
+                  d={riverPath(i, bandH)}
                   className="stroke-current text-accent"
                   fill="none"
                   strokeWidth={2.5}
-                  strokeOpacity={0.18 + s.explored * 0.3}
+                  strokeOpacity={0.16 + s.explored * 0.3}
                   strokeLinecap="round"
                 />
               </svg>
 
-              {/* Concept nodes placed by year, alternating sides */}
+              {/* One evenly-spaced row per concept, chronological top-to-bottom, dot on
+                  the river with its label on the alternating side — never overlaps. */}
               {nodes.map((n, j) => {
-                const t = (n.year - s.era.startYear) / Math.max(1, s.era.endYear - s.era.startYear)
-                const top = 24 + Math.min(0.95, Math.max(0.02, t)) * (RIVER_BAND - 44)
-                const left = j % 2 === 0 ? 54 : 62 // percentages, near the river
-                const side = j % 2 === 0 ? 'right' : 'left'
+                const top = BAND_HEADER + j * NODE_ROW
+                const labelLeft = j % 2 === 1
                 return (
                   <button
                     key={n.id}
                     type="button"
                     onClick={() => onOpenConcept(n.id)}
-                    className="absolute z-10 flex items-center gap-1.5"
-                    style={{ top, [side === 'right' ? 'left' : 'right']: `${side === 'right' ? left : 100 - left}%` }}
+                    className="group absolute inset-x-0 z-10 flex items-center"
+                    style={{ top, height: NODE_ROW }}
                   >
-                    {side === 'left' && <NodeLabel name={n.name} year={n.year} met={n.met} align="right" />}
+                    <div className="flex flex-1 justify-end pr-2">
+                      {labelLeft && <NodeLabel name={n.name} year={n.year} met={n.met} align="right" />}
+                    </div>
                     <span
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full border ${
-                        n.met ? 'border-accent bg-accent' : 'border-ink/30 bg-bg'
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full border transition-transform group-hover:scale-125 ${
+                        n.met ? 'border-accent bg-accent' : 'border-ink/25 bg-bg'
                       }`}
-                      style={n.met ? { boxShadow: `0 0 ${4 + n.brightness * 8}px rgb(var(--accent) / ${0.4 + n.brightness * 0.5})` } : undefined}
+                      style={
+                        n.met
+                          ? { boxShadow: `0 0 ${4 + n.brightness * 8}px rgb(var(--accent) / ${0.4 + n.brightness * 0.5})` }
+                          : undefined
+                      }
                     />
-                    {side === 'right' && <NodeLabel name={n.name} year={n.year} met={n.met} align="left" />}
+                    <div className="flex flex-1 pl-2">
+                      {!labelLeft && <NodeLabel name={n.name} year={n.year} met={n.met} align="left" />}
+                    </div>
                   </button>
                 )
               })}
 
               {extra > 0 && (
-                <p className="absolute bottom-2 right-3 text-[10px] text-ink-softer">+{extra} more in this era</p>
+                <p className="absolute bottom-1.5 right-3 z-10 text-[10px] text-ink-softer">
+                  +{extra} more in this era
+                </p>
+              )}
+              {nodes.length === 0 && (
+                <p className="absolute right-3 top-3 z-10 text-[10px] text-ink-softer">
+                  nothing dated here yet
+                </p>
               )}
             </div>
           )
@@ -308,18 +352,23 @@ function TimeRiver({
 
 function NodeLabel({ name, year, met, align }: { name: string; year: number; met: boolean; align: 'left' | 'right' }) {
   return (
-    <span className={`max-w-[38vw] truncate text-[11px] ${align === 'right' ? 'text-right' : 'text-left'} ${met ? 'text-ink' : 'text-ink-softer'}`}>
+    <span
+      className={`block max-w-full truncate text-[11px] ${align === 'right' ? 'text-right' : 'text-left'} ${
+        met ? 'text-ink' : 'text-ink-softer'
+      }`}
+    >
       {name} <span className="text-ink-softer">· {fmtYearShort(year)}</span>
     </span>
   )
 }
 
-function riverPath(i: number): string {
-  // Gentle S that meets the previous/next band at the horizontal centre.
+function riverPath(i: number, bandH: number): string {
+  // Gentle S down the centre that meets the neighbouring bands at the midline.
   const flip = i % 2 === 0
+  const mid = bandH / 2
   return flip
-    ? `M 58 0 C 74 60, 42 150, 58 ${RIVER_BAND}`
-    : `M 58 0 C 42 60, 74 150, 58 ${RIVER_BAND}`
+    ? `M 50 0 C 66 ${mid * 0.55}, 34 ${mid * 1.45}, 50 ${bandH}`
+    : `M 50 0 C 34 ${mid * 0.55}, 66 ${mid * 1.45}, 50 ${bandH}`
 }
 
 function fmtYearShort(y: number): string {

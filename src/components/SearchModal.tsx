@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { db, type Concept, type Collection } from '../db/schema'
 import { generateConcept } from '../lib/ai'
 import { contributeConcept, insertAiConcept } from '../lib/community'
+import { bumpToday } from '../lib/metrics'
 import { useSettings } from '../store/useSettings'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 
@@ -104,6 +105,7 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
     // Fire-and-forget contribution.
     await insertAiConcept(res.concept, level, level)
     contributeConcept(res.concept, level)
+    void bumpToday({ generated: 1 }) // §E6
     setRabbitHoleId(res.concept.id)
   }
 

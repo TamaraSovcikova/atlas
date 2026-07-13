@@ -14,6 +14,7 @@ import {
 import { connectionsFor } from '../lib/connections'
 import { deepenConcept } from '../lib/community'
 import { recordRating, recordFeedCard } from '../lib/grade'
+import { bumpToday, recordGateStage } from '../lib/metrics'
 import { useSettings } from '../store/useSettings'
 import { FeedCard, type SwipeInterest } from './FeedCard'
 
@@ -44,6 +45,7 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
       setGatePill(null)
       return
     }
+    void recordGateStage(stage) // §E6: which gate stage the feed served (progression signal)
     const ack = await loadCeilingAck()
     if (stage > ack) {
       // One-shot: acknowledge immediately so the moment shows for this batch
@@ -169,6 +171,7 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
 
     currentIndexRef.current = idx
     setCurrentIndex(idx)
+    void bumpToday({ feedCards: 1 }) // §E6: one card consumed
     if (idx >= items.length - 2) appendMore()
   }
 
@@ -211,6 +214,7 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     deepenedKeys.current.add(concept.id)
     setDeepening(concept.name)
     const ids = await deepenConcept(concept.id, useSettings.getState().prefs.knowledgeLevel)
+    void bumpToday({ deepened: 1 }) // §E6
     setDeepening(null)
     if (!ids.length || !stateRef.current) return
     // Seed the deep-queue with the new concepts, then pull a batch so they appear.
