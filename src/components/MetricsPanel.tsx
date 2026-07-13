@@ -28,7 +28,7 @@ export function MetricsPanel() {
   if (rows.length === 0) {
     return (
       <p className="text-xs text-ink-softer">
-        No activity recorded yet. This fills in as you use Atlas — it stays on this device.
+        No activity recorded yet. This fills in as you use Atlas, and stays on this device.
       </p>
     )
   }

@@ -457,7 +457,7 @@ export function SettingsView({ canInstall, onInstall }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-ink">Insights</h3>
         <p className="text-xs text-ink-softer">
-          A private, on-device record of how you use Atlas — nothing here is ever sent anywhere.
+          A private, on-device record of how you use Atlas. Nothing here is ever sent anywhere.
         </p>
         <MetricsPanel />
       </div>
