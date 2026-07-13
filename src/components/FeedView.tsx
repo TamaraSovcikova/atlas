@@ -24,7 +24,7 @@ const RATE_STEPS = [0.75, 1.0, 1.25, 1.5, 2.0]
 // Minimum time on a card before a scroll-past counts as "read". Below this it was
 // a flick, not a read: we don't mark it covered, so it returns later instead of
 // being scheduled for review you never actually saw. Tapping "Got it" always counts.
-const READ_DWELL_MS = 2500
+const READ_DWELL_MS = 4000
 
 interface Props {
   onOpenConcept: (concept: Concept, threadName: string | null) => void
