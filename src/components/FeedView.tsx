@@ -21,6 +21,10 @@ import { FeedCard, type SwipeInterest } from './FeedCard'
 const INITIAL_BATCH = 6
 const PAGE_BATCH = 5
 const RATE_STEPS = [0.75, 1.0, 1.25, 1.5, 2.0]
+// Minimum time on a card before a scroll-past counts as "read". Below this it was
+// a flick, not a read: we don't mark it covered, so it returns later instead of
+// being scheduled for review you never actually saw. Tapping "Got it" always counts.
+const READ_DWELL_MS = 2500
 
 interface Props {
   onOpenConcept: (concept: Concept, threadName: string | null) => void
@@ -139,12 +143,19 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
 
   // Seed one new-concept card into FSRS (firstSeenAt + a 'good' schedule) so it
   // counts as "covered" and never reappears as New. Idempotent via gradedKeys.
-  const seedConcept = useCallback((item: FeedItem | undefined, now = Date.now()) => {
-    if (!item || item.kind !== 'concept' || gradedKeys.current.has(item.key)) return
-    gradedKeys.current.add(item.key)
-    recordRating(item.concept.id, 'good', now).catch(() => {})
-    recordFeedCard('good', true, now).catch(() => {})
-  }, [])
+  // `dwellMs` is how long the card was on screen: a quick flick (below the read
+  // threshold) is NOT marked covered, so it comes back later rather than being
+  // scheduled for a review you never read. Pass Infinity to force (explicit "Got it").
+  const seedConcept = useCallback(
+    (item: FeedItem | undefined, dwellMs: number, now = Date.now()) => {
+      if (!item || item.kind !== 'concept' || gradedKeys.current.has(item.key)) return
+      if (dwellMs < READ_DWELL_MS) return
+      gradedKeys.current.add(item.key)
+      recordRating(item.concept.id, 'good', now).catch(() => {})
+      recordFeedCard('good', true, now).catch(() => {})
+    },
+    [],
+  )
 
   function handleCurrentChange(idx: number) {
     const prevIdx = currentIndexRef.current
@@ -154,12 +165,11 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
 
     const prev = items[prevIdx]
 
-    // Seed EVERY new concept card at or above where we now are — anything the
-    // user has scrolled past counts as covered. Seeding only the immediately
-    // previous card missed fast flicks (intermediate cards never hit the 0.6
-    // intersection threshold), which is why covered concepts kept coming back
-    // as "New". gradedKeys makes this idempotent.
-    for (let i = 0; i < idx && i < items.length; i++) seedConcept(items[i], now)
+    // Mark the card you're LEAVING as covered only if you dwelled long enough to
+    // read it (dwell-gated in seedConcept). Cards you flick straight past — including
+    // any skipped between prevIdx and idx in a fast flick — are intentionally left
+    // uncovered so they return later instead of being logged as read-but-unseen.
+    seedConcept(prev, dwell, now)
 
     // Implicit dwell signal for the item we just left (discovery cards only —
     // reviews are graded, not interest-rated).
@@ -180,7 +190,8 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
   // the last concept you read each session is lost and shows as New next time.
   useEffect(() => {
     function seedCurrent() {
-      seedConcept(items[currentIndexRef.current])
+      // Same dwell gate: only the card you actually sat on counts as read.
+      seedConcept(items[currentIndexRef.current], Date.now() - dwellStartRef.current)
     }
     function onVisibility() {
       if (document.visibilityState === 'hidden') seedCurrent()
