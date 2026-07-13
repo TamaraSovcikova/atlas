@@ -119,7 +119,8 @@ export function applySwipeToWeights(
   let factor = 1
   if (direction === 'left') factor = BOOST_FACTOR
   else if (direction === 'right') factor = DECAY_FACTOR
-  else if (dwellMs < DWELL_SHORT_MS) factor = DWELL_BORED_FACTOR
+  // A quick scroll-past is NEUTRAL — browsing fast should never read as dislike.
+  // Only an explicit "Less" (right) lowers a topic; genuine lingering nudges it up.
   else if (dwellMs > DWELL_LONG_MS) factor = DWELL_KEEN_FACTOR
 
   if (factor === 1) return next

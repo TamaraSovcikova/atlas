@@ -6,6 +6,7 @@ import type { RecallItem } from '../lib/session'
 import { buildRecallItemFor } from '../lib/session'
 import type { RecallRating } from '../lib/fsrs'
 import { recordRating, recordFeedCard } from '../lib/grade'
+import { saveConcept, unsaveConcept, isSaved } from '../lib/saved'
 import { useSettings } from '../store/useSettings'
 import { RecallCard } from './RecallCard'
 import { LinkedText } from './LinkedText'
@@ -257,7 +258,7 @@ function ConnectionCard({
       ? Math.abs(item.to.approxYear - item.from.approxYear)
       : null
   return (
-    <CardFrame label="A connection in your constellation" onInterest={onInterest}>
+    <CardFrame label="A connection in your constellation" onInterest={onInterest} saveConceptId={item.from.id}>
       <button
         type="button"
         onClick={() => onOpenConcept(item.from, null)}
@@ -338,7 +339,7 @@ function LearningCard({
 
   if (phase === 'brief') {
     return (
-      <CardFrame label="New · read it once" onInterest={onInterest}>
+      <CardFrame label="New · read it once" onInterest={onInterest} saveConceptId={concept.id}>
         <BriefBody
           concept={concept}
           onConceptClick={openConceptById}
@@ -394,12 +395,15 @@ function CardFrame({
   label,
   domainDot,
   onInterest,
+  saveConceptId,
   children,
 }: {
   label: string
   domainDot?: string
   /** When provided, the whole card becomes horizontally swipeable for interest. */
   onInterest?: (direction: SwipeInterest) => void
+  /** Concept id the Save button bookmarks (omit to hide Save). */
+  saveConceptId?: string
   children: React.ReactNode
 }) {
   const surface = <div className="surface p-6">{children}</div>
@@ -415,24 +419,8 @@ function CardFrame({
 
         {onInterest ? <InterestSwipe onCommit={onInterest}>{surface}</InterestSwipe> : surface}
 
-        {/* Swipe legend (only on interest cards) */}
-        {onInterest && (
-          <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-ink-softer/70">
-            <span className="flex items-center gap-1 text-accent/70">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-              Swipe for more
-            </span>
-            <span className="h-3 w-px bg-ink/15" />
-            <span className="flex items-center gap-1">
-              Less of it
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </span>
-          </div>
-        )}
+        {/* Explicit Less · Save · More (swipe still works as a shortcut) */}
+        {onInterest && <InterestRow onInterest={onInterest} conceptId={saveConceptId} />}
 
         {/* Swipe-up cue */}
         <div className="mt-4 flex justify-center">
@@ -450,6 +438,83 @@ function CardFrame({
           </svg>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Explicit interest controls: Less · Save · More. More/Less mirror the L/R swipe
+ * (boost / decay + deepen); Save bookmarks the concept with NO weight change.
+ * Swiping still works, so these are the legible, deliberate alternative.
+ */
+function InterestRow({
+  onInterest,
+  conceptId,
+}: {
+  onInterest: (direction: SwipeInterest) => void
+  conceptId?: string
+}) {
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    let live = true
+    if (conceptId) isSaved(conceptId).then((s) => live && setSaved(s))
+    return () => {
+      live = false
+    }
+  }, [conceptId])
+
+  async function toggleSave() {
+    if (!conceptId) return
+    if (saved) {
+      await unsaveConcept(conceptId)
+      setSaved(false)
+    } else {
+      await saveConcept(conceptId)
+      setSaved(true)
+    }
+  }
+
+  const btn = 'flex items-center gap-1.5 rounded-full border px-4 py-2 text-xs transition-colors'
+  return (
+    <div className="mt-3 flex items-center justify-center gap-2">
+      <button
+        type="button"
+        onClick={() => onInterest('right')}
+        className={`${btn} border-ink/[0.1] text-ink-softer hover:border-ink/20 hover:text-ink`}
+        aria-label="Less of this"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+          <path d="M5 12h14" />
+        </svg>
+        Less
+      </button>
+
+      {conceptId && (
+        <button
+          type="button"
+          onClick={toggleSave}
+          className={`${btn} ${saved ? 'border-accent/40 bg-accent/10 text-accent' : 'border-ink/[0.1] text-ink-softer hover:border-accent/30 hover:text-ink'}`}
+          aria-pressed={saved}
+          aria-label={saved ? 'Saved' : 'Save for later'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+          {saved ? 'Saved' : 'Save'}
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => onInterest('left')}
+        className={`${btn} border-accent/30 bg-accent/[0.06] text-accent hover:bg-accent/12`}
+        aria-label="More like this"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        More
+      </button>
     </div>
   )
 }

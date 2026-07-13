@@ -85,16 +85,24 @@ describe('applySwipeToWeights', () => {
     expect(w.domains.culture!).toBe(WEIGHT_CAP)
   })
 
-  it('left/right move era + thread axes; up moves domain only', () => {
+  it('left/right move era + thread axes; up (dwell) moves domain only', () => {
     const topic = { domain: 'history' as Domain, eras: ['e1'], threads: ['t1'] }
     const left = applySwipeToWeights(emptyWeights(0), topic, 'left', 0, 1)
     expect(left.eras.e1!).toBeGreaterThan(1)
     expect(left.threads.t1!).toBeGreaterThan(1)
 
-    const up = applySwipeToWeights(emptyWeights(0), topic, 'up', 100, 1) // short dwell
-    expect(up.domains.history!).toBeLessThan(1)
-    expect(up.eras.e1).toBeUndefined()
-    expect(up.threads.t1).toBeUndefined()
+    // Long dwell = a gentle positive on the domain only (never eras/threads).
+    const keen = applySwipeToWeights(emptyWeights(0), topic, 'up', 20000, 1)
+    expect(keen.domains.history!).toBeGreaterThan(1)
+    expect(keen.eras.e1).toBeUndefined()
+    expect(keen.threads.t1).toBeUndefined()
+  })
+
+  it('a quick scroll-past is neutral — skipping never reads as dislike', () => {
+    const topic = { domain: 'history' as Domain, eras: ['e1'], threads: ['t1'] }
+    const skip = applySwipeToWeights(emptyWeights(0), topic, 'up', 100, 1) // short dwell
+    expect(skip.domains.history).toBeUndefined() // unchanged from empty (no decay)
+    expect(skip.eras.e1).toBeUndefined()
   })
 })
 
