@@ -62,7 +62,7 @@ Live: **https://atlas-6uj.pages.dev** (OAuth as tamara.sovcik@gmail.com). PWA se
 
 **Gestures.** Horizontal interest-swipe uses native non-passive `touchmove`+preventDefault (iOS Safari ignores `touch-action` inside scroll-snap; pointer-capture failed). The whole card translates+tilts and springs back, with "More like this"/"Less of this" badges + a persistent legend.
 
-**AI.** Worker secrets `GEMINI_API_KEY` (from Revisia GOOGLE_AI_API_KEY) + `GROQ_API_KEY` are set on `atlas-sync` -> pooled AI generation is live. Google OAuth still NOT enabled (needs separate Google Cloud `GOOGLE_CLIENT_ID`/`SECRET`+`JWT_SECRET`; Revisia uses Supabase, no OAuth creds). `speechRate` pref added; listen mode reads cards in the feed + StoryBrief at adjustable speed.
+**AI.** Worker secrets `GEMINI_API_KEY` (from Revisia GOOGLE_AI_API_KEY) + `GROQ_API_KEY` are set on `atlas-sync` -> pooled AI generation is live. **Google OAuth ENABLED (Chat #23, 2026-07-12):** `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` set as `atlas-sync` Worker secrets; `/auth/google/start` returns 302 to Google's consent (verified). Redirect URI registered in Google Cloud = `https://atlas-sync.tamara-sovcik.workers.dev/auth/google/callback`. NOTE: `JWT_SECRET` is declared in the Worker Env but UNUSED — session tokens are random ids in the D1 `sessions` table, not signed JWTs. App is in Google "Testing" mode, so only added Test users can complete sign-in. `speechRate` pref added; listen mode reads cards in the feed + StoryBrief at adjustable speed.
 
 > Full phase history: `~/workspace/Projects/Atlas/docs/EVOLUTION.md`
 
