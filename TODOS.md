@@ -18,18 +18,17 @@ the reader (`aiVariant.ts` — pure, convergent, unit-tested). New: `src/lib/aiV
 **Remaining sub-scope not built:** AI-generated recall QUESTIONS (make `ai:`
 concepts quizzable) — still a separate future task.
 
-## P3 — Local instrumentation for gate + retention signals (E6)
+## DONE — Local instrumentation (E6, Chat #23, 2026-07-12)
 
-- **What:** Lightweight local-only counters (level distribution, gate hit-rate,
-  session completion, D1/D7 return) stored in Dexie; a debug view or export.
-- **Why:** §4b shipped on founder-user judgment (n=1). If the user base grows,
-  there is currently no way to see whether gating helps or hurts.
-- **Pros:** Falsifiable product decisions; catches "starved feed" regressions.
-- **Cons:** New infra; privacy posture must stay local-first; easy to over-build.
-- **Context:** Raised as F1 in the §4b CEO review (outside voice wanted telemetry
-  as a precondition; tempered to this TODO).
-- **Depends on:** nothing.
-- **Effort:** M (human) → S with CC.
+Local-only daily metrics rollup: new `metrics` Dexie table (v6, excluded from
+backup/sync), `src/lib/metrics.ts` (pure additive `mergeMetric` + race-safe
+`bumpToday` in a rw transaction). Counts opens, feed cards seen, gate stage
+served (1/2/3), generations, deepens. Read-only Insights panel in Settings
+(`MetricsPanel.tsx`): stat tiles, a gate-progression line (Foundations/Mid/Open %
+of 'new'-level batches — the "is the gate starving?" signal), a 7-day table, and
+copy-JSON export. No server telemetry. Verified live. **Not built:** D1/D7 return
+cohorting and session-completion counting (would need launch-history analysis;
+the per-day `opens` rollup is the raw material if wanted later).
 
 ## P3 — Behavioral placement (E8)
 
