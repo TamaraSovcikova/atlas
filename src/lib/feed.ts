@@ -419,7 +419,7 @@ export async function gatherPools(now = Date.now(), prefs?: Prefs): Promise<Feed
       computeAnchorsMet(threads, conceptById, reviewByConcept),
     )
     if (Number.isFinite(ceiling)) {
-      gate = { ceiling, complexityById: buildComplexityMap(threads) }
+      gate = { ceiling, complexityById: buildComplexityMap(threads, allConcepts) }
     }
   }
 

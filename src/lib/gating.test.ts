@@ -52,6 +52,23 @@ describe('buildComplexityMap / conceptComplexity', () => {
     expect(conceptComplexity('b', map)).toBe(2)
     expect(conceptComplexity('nowhere', map)).toBe(UNTIERED_COMPLEXITY)
   })
+
+  it('folds AI concept complexity for untiered concepts, tier wins over difficulty, and clamps (§E5)', () => {
+    const threads = [thread([{ conceptId: 'bank-a', tier: 1 }])]
+    const concepts = [
+      { id: 'bank-a', complexity: 3 }, // in a thread → tier 1 wins, difficulty ignored
+      { id: 'ai:easy', complexity: 1 }, // untiered AI → uses its difficulty
+      { id: 'ai:hard', complexity: 3 },
+      { id: 'ai:weird', complexity: 9 }, // clamped to 3
+      { id: 'ai:none' }, // no complexity → stays untiered default
+    ]
+    const map = buildComplexityMap(threads, concepts)
+    expect(conceptComplexity('bank-a', map)).toBe(1)
+    expect(conceptComplexity('ai:easy', map)).toBe(1)
+    expect(conceptComplexity('ai:hard', map)).toBe(3)
+    expect(conceptComplexity('ai:weird', map)).toBe(3)
+    expect(conceptComplexity('ai:none', map)).toBe(UNTIERED_COMPLEXITY)
+  })
 })
 
 describe('computeAnchorsMet', () => {

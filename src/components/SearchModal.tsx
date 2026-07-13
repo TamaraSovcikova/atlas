@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { db, type Concept, type Collection } from '../db/schema'
 import { generateConcept } from '../lib/ai'
 import { contributeConcept, insertAiConcept } from '../lib/community'
+import { useSettings } from '../store/useSettings'
 import { ConceptRabbitHole } from './ConceptRabbitHole'
 
 interface ThreadResult {
@@ -88,7 +89,8 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
     setGenerating(true)
     setGenError(null)
 
-    const res = await generateConcept(q)
+    const level = useSettings.getState().prefs.knowledgeLevel
+    const res = await generateConcept(q, level)
     setGenerating(false)
 
     if (!res.ok) {
@@ -97,10 +99,11 @@ export function SearchModal({ onClose, onNavigateAtlas }: Props) {
     }
 
     // Save the AI-generated concept locally (with a review row so it can be
-    // tracked) and share it to the community bank so everyone gets it, not just
-    // this person's vault. Fire-and-forget contribution.
-    await insertAiConcept(res.concept)
-    contributeConcept(res.concept)
+    // tracked) and share it to the community bank under this reader's level
+    // variant (§E5), so everyone gets it, not just this person's vault.
+    // Fire-and-forget contribution.
+    await insertAiConcept(res.concept, level, level)
+    contributeConcept(res.concept, level)
     setRabbitHoleId(res.concept.id)
   }
 

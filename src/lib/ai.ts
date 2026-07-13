@@ -1,5 +1,21 @@
 import { db, type RelationType } from '../db/schema'
 import { SYNC_URL } from './sync'
+import type { KnowledgeLevel } from './settings'
+
+/**
+ * Per-level phrasing guidance (§E5). Folded into generation prompts so a card is
+ * written at the reader's depth. Voice follows docs/CONTENT_VOICE.md: patient,
+ * concrete, neutral, hyphens only (never dashes).
+ */
+const LEVEL_GUIDANCE: Record<KnowledgeLevel, string> = {
+  new: 'Write for a curious beginner with no background. Define any term you use, prefer plain words, and anchor it with one concrete image. Assume nothing.',
+  some: 'Write a concise, encyclopedic summary for a generally-informed adult.',
+  confident: 'Write for a reader with solid background. Be precise and information-dense, name specifics, and skip basic definitions.',
+}
+
+function clampComplexity(v: unknown): number {
+  return typeof v === 'number' && v >= 1 && v <= 3 ? Math.round(v) : 2
+}
 
 /**
  * Atlas AI layer (Wave 4). All AI is optional and online-only; every feature
@@ -180,7 +196,7 @@ In 2-3 sentences: why is the correct answer right, and what was tricky about thi
  * Returns structured concept data parsed from the AI JSON reply.
  * Degrades gracefully when the AI endpoint isn't configured.
  */
-export async function generateConcept(query: string): Promise<
+export async function generateConcept(query: string, level: KnowledgeLevel = 'some'): Promise<
   | {
       ok: true
       concept: {
@@ -195,6 +211,7 @@ export async function generateConcept(query: string): Promise<
         lng: number | null
         wikipediaUrl: string | null
         imageUrl: null
+        complexity: number
       }
     }
   | { ok: false; error: string }
@@ -203,15 +220,18 @@ export async function generateConcept(query: string): Promise<
 Return ONLY valid JSON — no markdown fences, no prose, nothing else outside the JSON object.`
   const prompt = `Query: "${query}"
 
+${LEVEL_GUIDANCE[level]}
+
 Return a single JSON object for the closest matching historical/world-knowledge concept:
 {
   "name": "canonical English name",
   "domain": "one of: history|geography|politics|religions|culture|science|modern_world",
-  "summary": "2-3 sentence encyclopedic summary",
+  "summary": "2-3 sentence summary, phrased as instructed above",
   "approxYear": year as integer or null,
   "lat": decimal latitude or null,
   "lng": decimal longitude or null,
-  "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null
+  "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null,
+  "difficulty": how advanced the TOPIC itself is (not your phrasing) as an integer 1-3: 1 = foundational/widely known, 2 = moderate, 3 = niche/advanced
 }`
 
   const res = await callAI(prompt, system)
@@ -228,12 +248,13 @@ Return a single JSON object for the closest matching historical/world-knowledge 
       lat?: number | null
       lng?: number | null
       wikipediaUrl?: string | null
+      difficulty?: number
     }
     const VALID_DOMAINS = ['history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world']
     const name = parsed.name ?? query
-    // Stable id (no timestamp) so the SAME topic gets the SAME id for every user.
-    // That lets a generated concept dedup globally and be shared via the community
-    // concepts endpoint instead of forking a new card per person.
+    // Stable BASE id (no timestamp, no level) so the SAME topic gets the SAME local
+    // id for every user — edges/reviews/deepen never fragment. Per-level phrasing is
+    // shared under a `#level` variant id at the community layer only (see aiVariant.ts).
     const id = `ai:${name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48)}`
     return {
       ok: true,
@@ -249,6 +270,7 @@ Return a single JSON object for the closest matching historical/world-knowledge 
         lng: typeof parsed.lng === 'number' ? parsed.lng : null,
         wikipediaUrl: typeof parsed.wikipediaUrl === 'string' ? parsed.wikipediaUrl : null,
         imageUrl: null,
+        complexity: clampComplexity(parsed.difficulty),
       },
     }
   } catch {
@@ -270,6 +292,8 @@ export interface DeepConcept {
   wikipediaUrl: string | null
   /** How the SEED concept relates to this deeper one. */
   relation: RelationType
+  /** Generated accessibility 1-3 (§E5). */
+  complexity: number
 }
 
 /**
@@ -283,6 +307,7 @@ export async function generateDeeperConcepts(
   seedName: string,
   seedSummary: string,
   known: string[],
+  level: KnowledgeLevel = 'some',
 ): Promise<{ ok: true; concepts: DeepConcept[] } | { ok: false; error: string }> {
   const system = `You are Atlas, a structured knowledge database for a learning app.
 Return ONLY valid JSON — no markdown fences, no prose, nothing outside the JSON object.`
@@ -293,15 +318,18 @@ sub-events, people, causes, consequences, or closely related ideas someone
 exploring "${seedName}" would want next. Do NOT repeat any of these already-covered
 concepts: ${known.slice(0, 25).join(', ') || 'none'}.
 
+${LEVEL_GUIDANCE[level]}
+
 Return a single JSON object:
 { "concepts": [
   {
     "name": "canonical English name",
     "domain": "one of: history|geography|politics|religions|culture|science|modern_world",
-    "summary": "2-3 sentence encyclopedic summary",
+    "summary": "2-3 sentence summary, phrased as instructed above",
     "approxYear": year as integer or null,
     "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null,
-    "relation": "how the SEED relates to this concept — one of: caused|influenced_by|contemporary_of|located_in|part_of|opposed|successor_of|belief_in|student_of"
+    "relation": "how the SEED relates to this concept — one of: caused|influenced_by|contemporary_of|located_in|part_of|opposed|successor_of|belief_in|student_of",
+    "difficulty": how advanced the concept itself is as an integer 1-3 (1 = foundational, 3 = niche/advanced)
   }
 ] }`
 
@@ -329,6 +357,7 @@ Return a single JSON object:
         approxYear: typeof c.approxYear === 'number' ? c.approxYear : null,
         wikipediaUrl: typeof c.wikipediaUrl === 'string' ? c.wikipediaUrl : null,
         relation: DEEP_RELATIONS.includes(c.relation as RelationType) ? (c.relation as RelationType) : 'part_of',
+        complexity: clampComplexity(c.difficulty),
       })
     }
     if (out.length === 0) return { ok: false, error: 'No deeper concepts returned.' }

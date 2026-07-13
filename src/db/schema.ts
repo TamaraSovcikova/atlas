@@ -72,6 +72,20 @@ export interface Concept {
   firstSeenAt: number | null
   lastReviewedAt: number | null
   createdAt: number
+  /**
+   * Generated accessibility, 1 (foundational/widely known) to 3 (niche/advanced).
+   * Present on AI concepts (§E5); feeds the §4b knowledge-level gate directly
+   * instead of the untiered-default guess. Absent on bank concepts (they use
+   * thread tier). NOTE: distinct from FSRS `Review.difficulty`.
+   */
+  complexity?: number
+  /**
+   * Which knowledge-level phrasing this local AI card currently reflects (§E5).
+   * The community bank stores per-level variants (`ai:slug#new`); locally we keep
+   * ONE concept per topic under its base id and record which variant's text it holds,
+   * so a better-matching variant can upgrade it without fragmenting edges/reviews.
+   */
+  aiVariant?: 'new' | 'some' | 'confident'
 }
 
 export interface Edge {

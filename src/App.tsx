@@ -73,7 +73,8 @@ function App() {
       }
       // Pull community-generated concepts in the background (online-only, never
       // blocks first paint). New cards appear via live queries when they land.
-      pullCommunityConcepts().catch(() => {})
+      // Pass the reader's level so per-level variants (§E5) converge on their depth.
+      pullCommunityConcepts(useSettings.getState().prefs.knowledgeLevel).catch(() => {})
     }
     init()
     return () => {

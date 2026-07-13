@@ -893,7 +893,7 @@ export async function buildDailySession(
   // the old per-thread selection order, so taking the first maxNew items
   // reproduces the old behaviour item for item).
   const level = prefs.knowledgeLevel ?? 'some'
-  const complexityById = buildComplexityMap(threads)
+  const complexityById = buildComplexityMap(threads, allConcepts)
   const ceiling =
     level === 'new'
       ? complexityCeiling('new', computeAnchorsMet(threads, conceptById, reviewByConcept))

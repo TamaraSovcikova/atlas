@@ -210,7 +210,7 @@ export function FeedView({ onOpenConcept, onOpenDashboard }: Props) {
     if (unseen.length >= 3) return // plenty to explore already — don't spend an AI call
     deepenedKeys.current.add(concept.id)
     setDeepening(concept.name)
-    const ids = await deepenConcept(concept.id)
+    const ids = await deepenConcept(concept.id, useSettings.getState().prefs.knowledgeLevel)
     setDeepening(null)
     if (!ids.length || !stateRef.current) return
     // Seed the deep-queue with the new concepts, then pull a batch so they appear.

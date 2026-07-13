@@ -35,13 +35,30 @@ export interface ThreadLike {
   members: ThreadMember[]
 }
 
-/** conceptId → min tier across all thread memberships. Absent id ⇒ untiered. */
-export function buildComplexityMap(threads: ThreadLike[]): Map<string, number> {
+/**
+ * conceptId → complexity. Primary source is the min tier across thread
+ * memberships. When `concepts` is passed, AI concepts' generated `complexity`
+ * (§E5) is folded in for any concept NOT already tiered by a thread — so a
+ * beginner-friendly generated card (complexity 1) can reach 'new' users and a
+ * dense one (complexity 3) stays rare, instead of every AI card defaulting to 2.
+ * Absent from the map ⇒ untiered ⇒ `UNTIERED_COMPLEXITY`.
+ */
+export function buildComplexityMap(
+  threads: ThreadLike[],
+  concepts?: { id: string; complexity?: number }[],
+): Map<string, number> {
   const map = new Map<string, number>()
   for (const t of threads) {
     for (const m of t.members) {
       const cur = map.get(m.conceptId)
       if (cur === undefined || m.tier < cur) map.set(m.conceptId, m.tier)
+    }
+  }
+  if (concepts) {
+    for (const c of concepts) {
+      if (map.has(c.id)) continue
+      if (typeof c.complexity !== 'number') continue
+      map.set(c.id, Math.min(3, Math.max(1, Math.round(c.complexity))))
     }
   }
   return map

@@ -28,6 +28,7 @@ import {
   type AtlasUser,
 } from '../lib/auth'
 import { getByokKey, setByokKey } from '../lib/ai'
+import { repullForLevel } from '../lib/community'
 
 const INTENSITIES: Intensity[] = ['playful', 'balanced', 'serious']
 const THEMES: { key: Theme; label: string }[] = [
@@ -301,7 +302,13 @@ export function SettingsView({ canInstall, onInstall }: Props) {
                 type="button"
                 role="radio"
                 aria-checked={active}
-                onClick={() => update({ knowledgeLevel: key })}
+                onClick={() => {
+                  update({ knowledgeLevel: key })
+                  // Re-scan the community bank so already-downloaded per-level
+                  // variants (§E5) upgrade to this reader's depth, not just cards
+                  // pulled after the change. Best-effort, online-only.
+                  void repullForLevel(key)
+                }}
                 className={`w-full rounded-2xl border p-4 text-left transition-colors ${
                   active
                     ? 'border-accent/70 bg-accent/10'

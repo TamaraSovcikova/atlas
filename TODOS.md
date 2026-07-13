@@ -3,24 +3,20 @@
 Deferred work with context. Created by /autoplan (Chat #23, 2026-07-12) during the
 §4b knowledge-level gating review; format per gstack TODO conventions.
 
-## P2 — Level-aware AI generation phrasing (E5)
+## DONE — Level-aware AI generation (E5, Chat #23, 2026-07-12)
 
-- **What:** Feed `prefs.knowledgeLevel` into the Worker `/ai` generation prompts so
-  generated concepts (and eventually recall questions) are phrased at the reader's
-  depth; long-term, per-card difficulty from generation replaces the thread-tier
-  complexity proxy.
-- **Why:** The tier proxy measures thread position, not reader difficulty (a tier-3
-  card can be the most accessible in the bank). Generation-aware difficulty is the
-  honest fix and the differentiated move for an LLM-native product.
-- **Pros:** Real per-card difficulty; better beginner experience; substrate already
-  laid (knowledgeLevel pref + complexity notion from §4b).
-- **Cons:** Touches worker prompt pipeline + community-sharing dedup (same `ai:` slug
-  at different depths); needs a schema decision for storing difficulty.
-- **Context:** §4b (2026-07) shipped the soft prefer-within-ceiling gate using min
-  thread tier as complexity. See the CEO review 10x check in
-  `~/.gstack/projects/TamaraSovcikova-atlas/ceo-plans/2026-07-12-4b-knowledge-gating.md`.
-- **Depends on:** §4b shipped.
-- **Effort:** M (human) → S with CC.
+Shipped the complete/robust variant. Generation (`generateConcept` /
+`generateDeeperConcepts`) takes the reader's `knowledgeLevel` and phrases the card
+for that depth, and returns a per-card `complexity` (1-3) that the §4b gate folds
+in via `buildComplexityMap` for untiered concepts (fixing tier≠difficulty for AI
+cards). Community sharing keeps per-level variants: `some` = base id `ai:<slug>`,
+`new`/`confident` = `ai:<slug>#new`/`#confident` (first-writer-wins per level, no
+worker change — the worker is id-opaque). LOCALLY every AI concept stays under its
+base id so edges/reviews/deepen never fragment; `insertAiConcept` upserts and only
+overwrites text/complexity when an incoming variant is a strictly better fit for
+the reader (`aiVariant.ts` — pure, convergent, unit-tested). New: `src/lib/aiVariant.ts`.
+**Remaining sub-scope not built:** AI-generated recall QUESTIONS (make `ai:`
+concepts quizzable) — still a separate future task.
 
 ## P3 — Local instrumentation for gate + retention signals (E6)
 
