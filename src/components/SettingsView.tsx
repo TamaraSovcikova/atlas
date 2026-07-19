@@ -324,6 +324,12 @@ export function SettingsView({ canInstall, onInstall }: Props) {
             )
           })}
         </div>
+        {prefs.knowledgeLevel === 'new' && (
+          <p className="text-xs text-ink-softer">
+            Depth also opens up on its own as you master the foundations — the more
+            you breeze through, the sooner deeper cards appear.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">

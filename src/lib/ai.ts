@@ -1,4 +1,4 @@
-import { db, type RelationType } from '../db/schema'
+import { db, type RecallQuestion, type RelationType } from '../db/schema'
 import { SYNC_URL } from './sync'
 import type { KnowledgeLevel } from './settings'
 
@@ -15,6 +15,36 @@ const LEVEL_GUIDANCE: Record<KnowledgeLevel, string> = {
 
 function clampComplexity(v: unknown): number {
   return typeof v === 'number' && v >= 1 && v <= 3 ? Math.round(v) : 2
+}
+
+/** Blank marker the cloze cards expect in a prompt. */
+const CLOZE_BLANK = '____'
+
+/**
+ * The recall-question fragment appended to a generation prompt, so an AI card
+ * ships with a real cloze the review loop can quiz — not just a read-only story.
+ * Kept simple (one cloze); chip distractors are synthesized locally at quiz time.
+ */
+const RECALL_SCHEMA_HINT = `  "recall": { "prompt": "one plain sentence about this concept with the single most important word, name, or year replaced by ${CLOZE_BLANK} (keep the ${CLOZE_BLANK} literally)", "answer": "just the word(s) that fill the blank" }`
+
+/**
+ * Validate an AI-returned recall object into at most one cloze RecallQuestion.
+ * Anything malformed (missing blank, empty/oversized answer, answer not actually
+ * removed from the prompt) yields [] so the card silently falls back to the
+ * locally-synthesized quiz rather than showing a broken question.
+ */
+export function parseRecallQuestions(raw: unknown): RecallQuestion[] {
+  if (!raw || typeof raw !== 'object') return []
+  const r = raw as { prompt?: unknown; answer?: unknown }
+  const prompt = typeof r.prompt === 'string' ? r.prompt.trim() : ''
+  const answer = typeof r.answer === 'string' ? r.answer.trim() : ''
+  if (!prompt || !answer) return []
+  if (!prompt.includes(CLOZE_BLANK)) return [] // must be a real fill-in-the-blank
+  if (answer.length > 60) return [] // a cloze answer is a term, not a sentence
+  // The answer must not still be sitting in the prompt (a giveaway / bad blank).
+  const promptWithoutBlank = prompt.replace(CLOZE_BLANK, ' ')
+  if (promptWithoutBlank.toLowerCase().includes(answer.toLowerCase())) return []
+  return [{ format: 'cloze', prompt, expectedAnswer: answer }]
 }
 
 /**
@@ -212,6 +242,7 @@ export async function generateConcept(query: string, level: KnowledgeLevel = 'so
         wikipediaUrl: string | null
         imageUrl: null
         complexity: number
+        recallQuestions: RecallQuestion[]
       }
     }
   | { ok: false; error: string }
@@ -231,7 +262,8 @@ Return a single JSON object for the closest matching historical/world-knowledge 
   "lat": decimal latitude or null,
   "lng": decimal longitude or null,
   "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null,
-  "difficulty": how advanced the TOPIC itself is (not your phrasing) as an integer 1-3: 1 = foundational/widely known, 2 = moderate, 3 = niche/advanced
+  "difficulty": how advanced the TOPIC itself is (not your phrasing) as an integer 1-3: 1 = foundational/widely known, 2 = moderate, 3 = niche/advanced,
+${RECALL_SCHEMA_HINT}
 }`
 
   const res = await callAI(prompt, system)
@@ -249,6 +281,7 @@ Return a single JSON object for the closest matching historical/world-knowledge 
       lng?: number | null
       wikipediaUrl?: string | null
       difficulty?: number
+      recall?: unknown
     }
     const VALID_DOMAINS = ['history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world']
     const name = parsed.name ?? query
@@ -271,6 +304,7 @@ Return a single JSON object for the closest matching historical/world-knowledge 
         wikipediaUrl: typeof parsed.wikipediaUrl === 'string' ? parsed.wikipediaUrl : null,
         imageUrl: null,
         complexity: clampComplexity(parsed.difficulty),
+        recallQuestions: parseRecallQuestions(parsed.recall),
       },
     }
   } catch {
@@ -294,6 +328,8 @@ export interface DeepConcept {
   relation: RelationType
   /** Generated accessibility 1-3 (§E5). */
   complexity: number
+  /** AI-authored cloze so the deeper card is quizzable, not read-only (§task3). */
+  recallQuestions: RecallQuestion[]
 }
 
 /**
@@ -329,7 +365,8 @@ Return a single JSON object:
     "approxYear": year as integer or null,
     "wikipediaUrl": "https://en.wikipedia.org/wiki/..." or null,
     "relation": "how the SEED relates to this concept — one of: caused|influenced_by|contemporary_of|located_in|part_of|opposed|successor_of|belief_in|student_of",
-    "difficulty": how advanced the concept itself is as an integer 1-3 (1 = foundational, 3 = niche/advanced)
+    "difficulty": how advanced the concept itself is as an integer 1-3 (1 = foundational, 3 = niche/advanced),
+${RECALL_SCHEMA_HINT}
   }
 ] }`
 
@@ -358,6 +395,7 @@ Return a single JSON object:
         wikipediaUrl: typeof c.wikipediaUrl === 'string' ? c.wikipediaUrl : null,
         relation: DEEP_RELATIONS.includes(c.relation as RelationType) ? (c.relation as RelationType) : 'part_of',
         complexity: clampComplexity(c.difficulty),
+        recallQuestions: parseRecallQuestions(c.recall),
       })
     }
     if (out.length === 0) return { ok: false, error: 'No deeper concepts returned.' }

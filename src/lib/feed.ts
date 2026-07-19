@@ -15,6 +15,7 @@ import {
   computeAnchorsMet,
   conceptComplexity,
 } from './gating'
+import { behaviouralAnchorBonus } from './placement'
 import type { KnowledgeLevel, Prefs } from './settings'
 
 /**
@@ -415,10 +416,14 @@ export async function gatherPools(now = Date.now(), prefs?: Prefs): Promise<Feed
   // applies, so the ungated assembly path stays bit-identical.
   let gate: FeedPools['gate']
   if (level === 'new') {
-    const ceiling = complexityCeiling(
-      'new',
-      computeAnchorsMet(threads, conceptById, reviewByConcept),
-    )
+    // Behavioural placement (§E8): credit earned anchor-equivalents for strong
+    // early performance so a demonstrably-capable 'new' user unlocks depth
+    // sooner. Acceleration only; the existing "deeper waters" pill just fires
+    // earlier. No effect for 'some'/'confident' (this branch is 'new'-only).
+    const anchors =
+      computeAnchorsMet(threads, conceptById, reviewByConcept) +
+      behaviouralAnchorBonus(threads, conceptById, reviewByConcept)
+    const ceiling = complexityCeiling('new', anchors)
     if (Number.isFinite(ceiling)) {
       gate = { ceiling, complexityById: buildComplexityMap(threads, allConcepts) }
     }

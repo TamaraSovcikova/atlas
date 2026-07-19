@@ -8,6 +8,7 @@ import {
   buildThreadSession,
   buildSpacedSession,
   buildMistakesSession,
+  synthLessonFor,
   type SessionItem,
   type SessionPlan,
   type SortBucket,
@@ -36,6 +37,8 @@ type StoredItem =
       conceptId: string
       isNew: boolean
       isFallback: boolean
+      /** Synthesized quiz on a lesson-less concept; rehydrates without a Lesson row. */
+      isSynth?: boolean
       question: RecallQuestion
     }
   | { kind: 'order'; cardKey: string; conceptIds: string[] }
@@ -83,6 +86,7 @@ function serialiseItem(item: SessionItem): StoredItem {
       conceptId: item.concept.id,
       isNew: item.isNew,
       isFallback: item.isFallback,
+      ...(item.isSynth ? { isSynth: true } : {}),
       question: item.question,
     }
   }
@@ -116,10 +120,18 @@ async function rehydrateItems(stored: StoredItem[]): Promise<SessionItem[]> {
   for (const s of stored) {
     if (s.kind === 'recall') {
       const concept = await db.concepts.get(s.conceptId)
-      if (!concept || !concept.lessonId) continue
-      const lesson = await db.lessons.get(concept.lessonId)
+      if (!concept) continue
       const review = await db.reviews.where('conceptId').equals(s.conceptId).first()
-      if (!lesson || !review) continue
+      if (!review) continue
+      // A synthesized item has no persisted Lesson by design, so requiring one
+      // would silently drop it on resume while cursor/counts still assumed it —
+      // landing the user on the wrong card. Rebuild its stand-in instead.
+      const lesson = s.isSynth
+        ? synthLessonFor(concept)
+        : concept.lessonId
+          ? await db.lessons.get(concept.lessonId)
+          : undefined
+      if (!lesson) continue
       out.push({
         kind: 'recall',
         cardKey: s.cardKey,
@@ -129,6 +141,7 @@ async function rehydrateItems(stored: StoredItem[]): Promise<SessionItem[]> {
         review,
         isNew: s.isNew,
         isFallback: s.isFallback,
+        ...(s.isSynth ? { isSynth: true } : {}),
       })
     } else if (s.kind === 'order') {
       const entries = []

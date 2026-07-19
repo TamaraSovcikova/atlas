@@ -442,8 +442,17 @@ async function callGroq(apiKey: string, prompt: string, system: string): Promise
 //
 // When a user generates a card for a topic the vault doesn't have, it's
 // contributed here so every user gets it, not just the author. Ids are stable
-// (`ai:<slug>`), so the same topic dedups globally and INSERT OR IGNORE keeps the
-// first author's version (a topic can't later be overwritten/vandalised).
+// (`ai:<slug>`), so the same topic dedups globally and first-writer-wins keeps
+// the first author's version (a topic can't be overwritten/vandalised).
+//
+// ONE exception, upgrade-only: a stored concept that has NO recallQuestions may
+// be enriched by a later contribution that HAS them. Without this, every topic
+// banked before recall questions existed stays permanently unquizzable for all
+// users, since the client can never republish it. The WHERE clause makes this
+// strictly additive: text is never replaced, and once a row has questions it is
+// frozen again. `created_at` is bumped on that upgrade BECAUSE the GET cursor
+// pages on `created_at > ?` — leaving it would enrich the row for new clients
+// only and never reach anyone who had already pulled past it.
 
 const MAX_CONCEPT_BYTES = 64 * 1024
 
@@ -480,11 +489,18 @@ async function handleConcepts(req: Request, env: Env): Promise<Response> {
       return json({ error: 'concept must have an ai: id, a name, and a summary' }, 400)
     }
     const nameKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '')
-    await env.DB.prepare(
+    const res = await env.DB.prepare(
       `INSERT INTO community_concepts (id, payload, name, name_key, created_at)
-       VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         payload = excluded.payload,
+         created_at = excluded.created_at
+       WHERE json_extract(community_concepts.payload, '$.recallQuestions') IS NULL
+         AND json_extract(excluded.payload, '$.recallQuestions') IS NOT NULL`,
     ).bind(id, JSON.stringify(c), name, nameKey, Date.now()).run()
-    return json({ ok: true })
+    // Report whether anything landed. The old handler always claimed ok:true even
+    // when the row was silently discarded, so a client could never tell.
+    return json({ ok: true, stored: (res.meta?.changes ?? 0) > 0 })
   }
 
   return json({ error: 'method not allowed' }, 405)

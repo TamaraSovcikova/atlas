@@ -4,7 +4,14 @@ import { LinkedText } from './LinkedText'
 
 interface Props {
   concept: Concept
-  variant?: 'intro' | 'reveal'
+  /**
+   * 'intro'    — teaching panel for a brand-new concept (name, image, footer).
+   * 'reveal'   — the story shown back after answering.
+   * 'stimulus' — QUESTION material: the summary only. The name, image and
+   *   Wikipedia link are all suppressed because they would give away the answer
+   *   on a card whose expected answer IS the concept name.
+   */
+  variant?: 'intro' | 'reveal' | 'stimulus'
   onConceptClick?: (conceptId: string) => void
 }
 
@@ -14,12 +21,13 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
     variant === 'intro'
       ? 'border-accent/30 bg-accent/5'
       : 'border-bg-softer/30 bg-bg-soft/50'
+  const isStimulus = variant === 'stimulus'
   return (
     <section className={`rounded-2xl border ${tone} p-5`}>
       {variant === 'intro' && (
         <p className="text-[11px] uppercase tracking-wider text-accent">New today</p>
       )}
-      <h3 className="mt-1 font-serif text-lg text-ink">{concept.name}</h3>
+      {!isStimulus && <h3 className="mt-1 font-serif text-lg text-ink">{concept.name}</h3>}
       {variant === 'intro' && concept.imageUrl && (
         <div className="mt-3 overflow-hidden rounded-xl">
           <img
@@ -42,7 +50,7 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           concept.summary
         )}
       </p>
-      {concept.wikipediaUrl && (
+      {concept.wikipediaUrl && !isStimulus && (
         <a
           href={concept.wikipediaUrl}
           target="_blank"

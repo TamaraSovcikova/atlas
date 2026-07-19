@@ -42,7 +42,11 @@ export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: P
 
   useEffect(() => setPicked(null), [item.cardKey])
 
-  const showBrief = item.isFallback || item.isNew
+  // A synthesized card's stimulus is the summary ALONE — its expected answer is
+  // the concept name, so the teaching brief (which prints the name) would give
+  // the answer away and auto-grade every card 'good'.
+  const showBrief = item.isSynth || item.isFallback || item.isNew
+  const briefVariant = item.isSynth ? 'stimulus' : 'intro'
   const gotIt = picked === correct
 
   function pick(opt: string) {
@@ -59,9 +63,9 @@ export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: P
         <p className="text-[11px] uppercase tracking-wider text-ink-softer">
           {concept.domain.replace('_', ' ')}
         </p>
-        {item.isFallback ? (
+        {item.isFallback || item.isSynth ? (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
-            pick
+            {item.isSynth ? 'name it' : 'pick'}
           </span>
         ) : item.isNew ? (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent">
@@ -69,7 +73,9 @@ export function ContrastCard({ item, onAnswered, onRevealed, onConceptClick }: P
           </span>
         ) : null}
       </header>
-      {showBrief && <Brief concept={concept} variant="intro" onConceptClick={onConceptClick} />}
+      {showBrief && (
+        <Brief concept={concept} variant={briefVariant} onConceptClick={onConceptClick} />
+      )}
       <p className="text-lg text-ink">{question.prompt}</p>
       <M.ul
         key={item.cardKey}

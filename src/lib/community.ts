@@ -1,4 +1,4 @@
-import { db, type Concept } from '../db/schema'
+import { db, type Concept, type Lesson, type RecallQuestion } from '../db/schema'
 import { SYNC_URL } from './sync'
 import { newReview } from './fsrs'
 import { generateDeeperConcepts } from './ai'
@@ -13,6 +13,10 @@ import { baseId, isBetterVariant, variantId, variantLevel } from './aiVariant'
  */
 
 const LAST_PULL_KEY = 'community:lastPull'
+
+const VALID_DOMAINS = [
+  'history', 'geography', 'politics', 'religions', 'culture', 'science', 'modern_world',
+]
 
 /** The raw generated-concept shape returned by `generateConcept` (pre-local-augment). */
 export interface RawConcept {
@@ -29,6 +33,96 @@ export interface RawConcept {
   imageUrl: string | null
   /** Generated accessibility 1-3 (§E5); absent on legacy community cards. */
   complexity?: number
+  /** AI-authored cloze(s) so the card is quizzable; absent on legacy cards. */
+  recallQuestions?: RecallQuestion[]
+}
+
+/** Deterministic lesson id for an AI concept's authored quiz. */
+function aiLessonId(conceptId: string): string {
+  return `${conceptId}--lesson`
+}
+
+const RECALL_FORMATS: RecallQuestion['format'][] = [
+  'cloze', 'cloze_chips', 'contrast', 'free', 'map',
+]
+
+const MAX_QUESTIONS = 3
+const MAX_PROMPT_LEN = 400
+const MAX_ANSWER_LEN = 60
+
+function cleanStringArray(v: unknown, cap: number): string[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v
+    .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    .map((s) => s.trim().slice(0, MAX_ANSWER_LEN))
+    .slice(0, cap)
+  return out.length > 0 ? out : undefined
+}
+
+/**
+ * Harden recall questions arriving from the shared bank. `POST /concepts` is
+ * unauthenticated and the Worker stores the payload opaquely, so anything here
+ * is attacker-controllable and reaches other users' vaults via the pull path.
+ * An unvalidated element is not cosmetic: `findByFormat` does `q.format` on
+ * every entry, and `buildMcqDistractors` walks EVERY lesson in the vault, so a
+ * single malformed row throws and breaks recall app-wide. Drop anything that
+ * isn't a well-formed question rather than trusting the sender.
+ */
+export function sanitizeRecallQuestions(v: unknown): RecallQuestion[] {
+  if (!Array.isArray(v)) return []
+  const out: RecallQuestion[] = []
+  for (const raw of v.slice(0, MAX_QUESTIONS)) {
+    if (!raw || typeof raw !== 'object') continue
+    const q = raw as Record<string, unknown>
+    if (!RECALL_FORMATS.includes(q.format as RecallQuestion['format'])) continue
+    const prompt = typeof q.prompt === 'string' ? q.prompt.trim() : ''
+    const expectedAnswer = typeof q.expectedAnswer === 'string' ? q.expectedAnswer.trim() : ''
+    if (!prompt || !expectedAnswer) continue
+    const clean: RecallQuestion = {
+      format: q.format as RecallQuestion['format'],
+      prompt: prompt.slice(0, MAX_PROMPT_LEN),
+      expectedAnswer: expectedAnswer.slice(0, MAX_ANSWER_LEN),
+    }
+    const distractors = cleanStringArray(q.distractors, 5)
+    if (distractors) clean.distractors = distractors
+    const chips = cleanStringArray(q.chipDistractors, 5)
+    if (chips) clean.chipDistractors = chips
+    if (typeof q.hint === 'string' && q.hint.trim()) {
+      clean.hint = q.hint.trim().slice(0, MAX_PROMPT_LEN)
+    }
+    out.push(clean)
+  }
+  return out
+}
+
+/**
+ * Attach AI-authored recall questions to an AI concept as a Lesson row, so the
+ * review loop can quiz it like any bank card. No-op when there are no valid
+ * questions (the card then relies on the locally-synthesized fallback quiz).
+ * Returns the lesson id when one was written, else null.
+ */
+async function writeAiLesson(
+  concept: Pick<Concept, 'id' | 'name' | 'summary'>,
+  questions: RecallQuestion[] | undefined,
+  now: number,
+): Promise<string | null> {
+  // Sanitize here rather than at the call sites: this is the single choke point
+  // for both the local generate path and the untrusted community pull path.
+  const safe = sanitizeRecallQuestions(questions)
+  if (safe.length === 0) return null
+  const id = aiLessonId(concept.id)
+  const lesson: Lesson = {
+    id,
+    conceptId: concept.id,
+    title: concept.name,
+    body: concept.summary,
+    recallQuestions: safe,
+    sourceUrls: [],
+    lastVerifiedAt: null,
+    createdAt: now,
+  }
+  await db.lessons.put(lesson)
+  return id
 }
 
 /**
@@ -39,7 +133,8 @@ export interface RawConcept {
  * decide whether an incoming variant is a better fit than the one already stored.
  *
  * A FSRS review row is added on first insert so the card can be seeded and never
- * resurfaces forever as New (AI concepts have no lesson, so they're read-only).
+ * resurfaces forever as New. AI concepts now get a Lesson row too when the
+ * generator returned a valid cloze, so they are quizzable rather than read-only.
  * Returns true only when a NEW local concept was created (not on an upgrade).
  */
 export async function insertAiConcept(
@@ -57,20 +152,44 @@ export async function insertAiConcept(
     // better than what we hold. Keep id, reviews, edges, and seen-state intact.
     const currentVariant = existing.aiVariant ?? 'some'
     if (isBetterVariant(textLevel, currentVariant, reader)) {
+      const lessonId =
+        (await writeAiLesson(
+          { id: localId, name: c.name, summary: c.summary },
+          c.recallQuestions,
+          now,
+        )) ?? existing.lessonId
       await db.concepts.update(localId, {
         summary: c.summary,
         aiVariant: textLevel,
+        lessonId,
         ...(typeof c.complexity === 'number' ? { complexity: c.complexity } : {}),
       })
+    } else if (!existing.lessonId && c.recallQuestions?.length) {
+      // Not a better text variant, but we finally have a quiz for a card that
+      // had none — attach it so the concept stops being read-only.
+      const lessonId = await writeAiLesson(
+        { id: localId, name: c.name, summary: c.summary },
+        c.recallQuestions,
+        now,
+      )
+      if (lessonId) await db.concepts.update(localId, { lessonId })
     }
     return false
   }
 
+  const lessonId = await writeAiLesson(
+    { id: localId, name: c.name, summary: c.summary },
+    c.recallQuestions,
+    now,
+  )
   const concept: Concept = {
     id: localId,
     name: c.name,
-    domain: c.domain as Concept['domain'],
-    lessonId: null,
+    // Community payloads are unauthenticated; an arbitrary domain string would
+    // land in an indexed column and flow into domain-keyed queries. Match the
+    // generate path (ai.ts) and fall back to 'history'.
+    domain: VALID_DOMAINS.includes(c.domain) ? (c.domain as Concept['domain']) : 'history',
+    lessonId,
     summary: c.summary,
     wikipediaUrl: c.wikipediaUrl ?? null,
     imageUrl: c.imageUrl ?? null,
@@ -199,6 +318,7 @@ export async function deepenConcept(
         wikipediaUrl: dc.wikipediaUrl,
         imageUrl: null,
         complexity: dc.complexity,
+        recallQuestions: dc.recallQuestions,
       }
       // Freshly generated at the reader's level, so text level = reader.
       await insertAiConcept(raw, reader, reader, now)

@@ -17,6 +17,7 @@ import {
   computeAnchorsMet,
   orderByCeiling,
 } from './gating'
+import { behaviouralAnchorBonus } from './placement'
 
 export { TIER_REPS_GATE }
 
@@ -29,6 +30,13 @@ export interface RecallItem {
   review: Review
   isNew: boolean
   isFallback: boolean
+  /**
+   * True for a locally-synthesized quiz on a concept that has no authored
+   * question (AI cards). Distinct from `isFallback`, which means "you kept
+   * failing this, here's an easier format" — conflating them would show the
+   * teaching brief (and therefore the answer) on a synthesized card.
+   */
+  isSynth?: boolean
 }
 
 export interface OrderEntry {
@@ -549,26 +557,99 @@ async function makeRecallItem(
   prefix: string,
   rotationIndex: number,
 ): Promise<RecallItem | null> {
-  if (!concept.lessonId) return null
-  const lesson = await db.lessons.get(concept.lessonId)
-  if (!lesson || lesson.recallQuestions.length === 0) return null
-  const { question, isFallback } = await chooseQuestion(
-    policy,
-    isNew,
-    review,
-    lesson,
-    concept,
-    rotationIndex,
+  const lesson = concept.lessonId ? await db.lessons.get(concept.lessonId) : undefined
+  if (lesson && lesson.recallQuestions.length > 0) {
+    const { question, isFallback } = await chooseQuestion(
+      policy,
+      isNew,
+      review,
+      lesson,
+      concept,
+      rotationIndex,
+    )
+    return {
+      kind: 'recall',
+      cardKey: `${prefix}:${concept.id}`,
+      concept,
+      lesson,
+      question,
+      review,
+      isNew,
+      isFallback,
+    }
+  }
+  // No authored questions (AI concept / legacy card) — synthesize a "name it
+  // from its summary" recall so the concept is quizzable instead of read-only
+  // forever. Returns null when the format is disabled or the vault is too small.
+  return makeSynthRecallItem(concept, review, isNew, policy, prefix)
+}
+
+/** Distractors required before a synthesized quiz is worth showing (4 options). */
+export const SYNTH_MIN_DISTRACTORS = 3
+
+/**
+ * A lesson-less concept's synthesized quiz: name it from its SUMMARY ALONE,
+ * among same-domain distractors.
+ *
+ * The stimulus must never include the concept name — the expected answer IS the
+ * name, so rendering the standard teaching brief above the options would print
+ * the answer and every card would auto-grade 'good', corrupting FSRS. Hence
+ * `isSynth` (ContrastCard renders Brief variant="stimulus" for it) rather than
+ * reusing `isFallback`.
+ *
+ * Returns null rather than degrading: a disabled contrast format is respected,
+ * and fewer than SYNTH_MIN_DISTRACTORS options would be a coin flip whose result
+ * is fed straight into the schedule. The lesson is ephemeral (never persisted);
+ * RecallItem.lesson is a data carrier the recall UI doesn't render.
+ */
+async function makeSynthRecallItem(
+  concept: Concept,
+  review: Review,
+  isNew: boolean,
+  policy: Policy,
+  prefix: string,
+): Promise<RecallItem | null> {
+  if (!policy.contrast) return null // user turned tap-to-pick cards off
+  const distractors = await buildMcqDistractors(
+    concept.id,
+    concept.domain,
+    SYNTH_MIN_DISTRACTORS,
   )
+  if (distractors.length < SYNTH_MIN_DISTRACTORS) return null
   return {
     kind: 'recall',
     cardKey: `${prefix}:${concept.id}`,
     concept,
-    lesson,
-    question,
+    lesson: synthLessonFor(concept),
+    question: synthQuestionFor(concept, distractors),
     review,
     isNew,
-    isFallback,
+    isFallback: false,
+    isSynth: true,
+  }
+}
+
+/** The synthesized question. Shared with plan rehydration so both agree. */
+export function synthQuestionFor(concept: Concept, distractors: string[]): RecallQuestion {
+  return {
+    format: 'contrast',
+    prompt: 'Which concept does this describe?',
+    expectedAnswer: concept.name,
+    distractors,
+  }
+}
+
+/** Ephemeral stand-in Lesson so a synthesized item satisfies RecallItem. */
+export function synthLessonFor(concept: Concept): Lesson {
+  return {
+    id: `${concept.id}--synth`,
+    conceptId: concept.id,
+    title: concept.name,
+    body: concept.summary,
+    recallQuestions: [],
+    sourceUrls: [],
+    lastVerifiedAt: null,
+    createdAt: concept.createdAt,
   }
 }
 
@@ -894,9 +975,16 @@ export async function buildDailySession(
   // reproduces the old behaviour item for item).
   const level = prefs.knowledgeLevel ?? 'some'
   const complexityById = buildComplexityMap(threads, allConcepts)
+  // Behavioural placement (§E8): strong early performance credits earned
+  // anchor-equivalents, so a capable 'new' user's Spine opens up sooner. Only
+  // the 'new' path consults it, so 'some'/'confident' stay unchanged.
   const ceiling =
     level === 'new'
-      ? complexityCeiling('new', computeAnchorsMet(threads, conceptById, reviewByConcept))
+      ? complexityCeiling(
+          'new',
+          computeAnchorsMet(threads, conceptById, reviewByConcept) +
+            behaviouralAnchorBonus(threads, conceptById, reviewByConcept),
+        )
       : Infinity
 
   const candidates: Concept[] = []
