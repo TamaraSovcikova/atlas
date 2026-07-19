@@ -4,8 +4,10 @@ The north star for every UI decision. The coding agent reads this before buildin
 screen and builds against it instead of defaulting to the generic AI look. The human sets
 the vision here once; the agent executes against it and self-checks with the Preview MCP.
 
-Last set: 2026-05-31. Direction chosen by Tamara: premium, crafted, clean, minimal,
-editorial-magazine / modern-museum. Both light and dark themes.
+Direction set 2026-05-31 by Tamara: premium, crafted, clean, minimal, editorial-magazine /
+modern-museum. Both light and dark themes. Revised 2026-07-19 to record that the feed is the
+home screen and the star atlas lives on the Atlas tab (see "The metaphor" below); the vibe,
+typography, colour, motion and layout direction are unchanged.
 
 ---
 
@@ -32,8 +34,18 @@ ownable mechanics no generic app has:
 - **Star colour = domain.** History, geography, politics, religions, culture, science, modern
   spine each own a hue. Clusters self-organise into recognisable constellations.
 
-The constellation must be **visible during a session** (not a tab you press) and the
-**hero of the home screen**. The current collapsed-banner-you-tap is a regression to undo.
+**Where the metaphor lives (updated 2026-07-19).** The original brief made the constellation
+the hero of the home screen. The July 2026 rework superseded that: **the infinite feed is the
+home**, because the product is a ten-minute daily habit and the feed is what makes returning
+effortless. The star atlas is now the **Atlas tab**, where it earned a fuller treatment than a
+home-screen banner ever allowed: a Map (fog-of-war eras), a Timeline (river of time), and the
+constellation Web.
+
+That is a change of PLACE, not of identity. The two ownable mechanics above still govern:
+brightness means retention, hue means domain, and both must read consistently wherever they
+appear. Judge the Atlas tab by whether the sky feels alive and earned; judge the feed by
+whether it feels like a calm reading spread. Do not "fix" the feed back into a constellation
+hero.
 
 ## Typography (the highest-leverage lever)
 
@@ -102,8 +114,11 @@ Even lightly restyling weight/terminals breaks the generated read.
 - One spring for all motion; star brightness tied to FSRS retention.
 - Generous negative space; type-led hierarchy; editorial asymmetry.
 - Self-host fonts; both themes; AA contrast; reduced-motion.
-- Use the Preview MCP to screenshot and self-critique every screen against this brief
-  before showing the human.
+- Screenshot and self-critique every screen against this brief before showing the human.
+  Tooling note: the in-app Preview MCP does not run from this repo's WSL UNC path. Use the
+  deployed URL with a headless browser for layout, type, colour and contrast. **Motion is the
+  exception** - headless throttles requestAnimationFrame, so springs and framer transitions
+  freeze or misreport. Judge motion only in a real foreground browser.
 
 ## DON'T
 
@@ -112,13 +127,14 @@ Even lightly restyling weight/terminals breaks the generated read.
 - Uniform rounded-card grids; centred hero + 3 feature cards.
 - Glassmorphism/blur as the only depth idea; uniform shadows on everything.
 - One-accent-on-flat-dark as the whole palette.
-- The constellation as a collapsed tab/banner you must press to see.
+- The star atlas reduced to decoration: a static thumbnail, or a sky that never changes as
+  you learn. It must respond to retention wherever it appears.
 - Fixed-duration linear motion; bounce for its own sake.
 
 ## How to use this file
 
 1. Every UI session: read this first. If a request conflicts with it, flag the conflict.
-2. Build the screen, then run the Preview MCP, screenshot it, and compare against DO/DON'T.
+2. Build the screen, screenshot it against the deployed URL, and compare to DO/DON'T.
    Fix divergences before involving the human.
 3. The human reviews whole screens against the vibe, not individual elements.
 4. If the vision itself should change, edit this file first, then the code.
