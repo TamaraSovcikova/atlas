@@ -103,8 +103,13 @@ export function Onboarding({ onDone }: Props) {
     }
   }
 
+  // min-h-dvh, not min-h-full: the parent <main> only sets min-height:100%, so its
+  // own height stays `auto` and a percentage min-height here has no definite basis
+  // to resolve against. It collapsed to content height (407px in an 844px viewport),
+  // stranding the card at the top with half the screen empty. dvh is viewport-relative
+  // and tracks the mobile URL bar.
   return (
-    <div className="mx-auto flex min-h-full max-w-md flex-col px-6 py-10">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10">
       <div className="flex flex-1 flex-col justify-center">
         <AnimatePresence mode="wait">
           {slide.kind === 'info' ? (
@@ -230,13 +235,16 @@ export function Onboarding({ onDone }: Props) {
       </div>
 
       <div className="flex items-center justify-between">
+        {/* Negative margin keeps the label optically flush with the container edge
+            while the padding gives it a real 44px touch target (it measured 29x20).
+            ink-soft, not ink-softer: softer is ~3.5:1 on paper, under WCAG AA. */}
         <button
           type="button"
           onClick={async () => {
             await persist()
             onDone()
           }}
-          className="text-sm text-ink-softer transition-colors hover:text-ink"
+          className="-mx-3 -my-3 px-3 py-3 text-sm text-ink-soft transition-colors hover:text-ink"
         >
           Skip
         </button>
