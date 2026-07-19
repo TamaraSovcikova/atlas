@@ -22,8 +22,12 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
       ? 'border-accent/30 bg-accent/5'
       : 'border-bg-softer/30 bg-bg-soft/50'
   const isStimulus = variant === 'stimulus'
+  // The stimulus carries no box chrome. Boxed, it rendered with the same radius,
+  // border and fill as the answer buttons below it, so the card read as five
+  // near-identical rounded rectangles and nothing led the eye. DESIGN.md: type
+  // does the hierarchy work, not boxes and borders, and no uniform card grids.
   return (
-    <section className={`rounded-2xl border ${tone} p-5`}>
+    <section className={isStimulus ? '' : `rounded-2xl border ${tone} p-5`}>
       {variant === 'intro' && (
         <p className="text-[11px] uppercase tracking-wider text-accent">New today</p>
       )}
@@ -43,7 +47,14 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           />
         </div>
       )}
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+      <p
+        className={
+          isStimulus
+            ? // It is the thing being read, so it gets primary weight and ink.
+              'text-base leading-relaxed text-ink'
+            : 'mt-2 text-sm leading-relaxed text-ink-soft'
+        }
+      >
         {onConceptClick ? (
           <LinkedText text={concept.summary} onConceptClick={onConceptClick} />
         ) : (
