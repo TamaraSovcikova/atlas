@@ -30,7 +30,20 @@ copy-JSON export. No server telemetry. Verified live. **Not built:** D1/D7 retur
 cohorting and session-completion counting (would need launch-history analysis;
 the per-day `opens` rollup is the raw material if wanted later).
 
-## P3 — Behavioral placement (E8)
+## DONE — Behavioral placement (E8, Chat #24, 2026-07-19)
+
+Shipped the safe half. New `src/lib/placement.ts`: `behaviouralAnchorBonus` credits earned
+anchor-equivalents (up to MAX_ANCHOR_BONUS=5, past MIN_STRONG_ANCHORS=3) for tier-1 anchors
+handled strongly (reps>=2, 0 lapses, FSRS difficulty<=5), added to `computeAnchorsMet` before
+`complexityCeiling` in `feed.ts` + `session.ts`. Accelerates ONLY the 'new' ceiling, so
+'some'/'confident' rng stays bit-identical; stateless + self-healing (recomputed from live
+Review rows, so a lapsed anchor stops counting). Existing "Deeper waters unlocked" pill fires
+sooner for free. Unit-tested (placement.test.ts). **Deliberately deferred:** the over-claim
+direction (demoting a struggling self-declared 'some'/'confident' user) -- that gates a
+self-declared level and draws the bias coin, breaking the 'some' bit-identity guarantee, so it
+needs its own UX. Cold-start (session 1) still unsolved by design.
+
+<details><summary>original spec</summary>
 
 - **What:** Infer knowledge level from first-session behavior (recall accuracy,
   "Got it" latency, swipe-away rate) instead of / in addition to the onboarding
@@ -44,18 +57,37 @@ the per-day `opens` rollup is the raw material if wanted later).
 - **Depends on:** E6 (needs the behavioral signals recorded).
 - **Effort:** L (human) → M with CC.
 
-## P3 — DESIGN.md refresh (stale directive)
+</details>
 
-- **What:** Update `DESIGN.md` (last set 2026-05-31): the "constellation must be
-  the hero of the home screen / visible during a session" directive was superseded
-  by the July feed rework (feed is home; constellation is the tertiary "Web" view
-  in AtlasViz). Re-state the current visual north star.
-- **Why:** A stale north-star doc misleads future UI sessions that are told to
-  calibrate every decision against it.
-- **Pros:** Cheap; prevents a future agent from "fixing" the feed back into a
-  constellation hero.
-- **Cons:** None beyond 15 minutes of writing.
-- **Context:** Flagged during the §4b design review (Phase 2, Step 0).
-- **Depends on:** nothing.
-- **Effort:** S.
+## DONE — DESIGN.md refresh (Chat #24, 2026-07-19)
+
+Rewrote the stale "constellation = home-screen hero / current home is a regression to undo"
+directive to record the July feed rework: feed IS the home, the star atlas lives on the Atlas
+tab (Map / Timeline / Web). Framed as a change of PLACE not identity (brightness=retention,
+hue=domain still govern). Also fixed the tooling note (Preview MCP does not run from the WSL
+UNC path; headless throttles rAF so motion needs a real foreground browser). Commit 5b4efcb.
+
+## P2 — AI recall Qs: perf + coverage follow-ups (Chat #24, 2026-07-19)
+
+- **What:** Two loose ends from the AI-recall-questions `/review`.
+  1. **Perf:** `makeSynthRecallItem` calls `buildMcqDistractors`, which deserializes ~320
+     full same-domain Concept rows per synth card on the FEED path (previously
+     `makeRecallItem` returned null at zero cost). Switch to
+     `db.concepts.where('domain').equals(d).primaryKeys()` + `bulkGet` of the hashed top 3.
+  2. **Coverage:** the repo has NO DB test infra (`fake-indexeddb` absent). `makeRecallItem`'s
+     contract inverted (null -> returns a card) and all of `community.ts` (writeAiLesson,
+     sanitizeRecallQuestions, the 3 insert branches) is untested. Add fake-indexeddb + cover.
+  3. **Verify the worker upgrade-only upsert** against a LOCAL D1 (a live POST writes junk to
+     the shared bank). Confirm an old row with no recallQuestions gains them and re-serves via
+     the created_at cursor.
+- **Context:** `/review` Chat #24; the testing specialist rated the coverage gap the top risk.
+- **Effort:** M.
+
+## P3 — Onboarding visual polish (design opinions, Chat #24)
+
+- **What:** Two `/design-review` findings left as taste calls, not fixed: (a) onboarding is
+  centred-everything inside a centred card (DESIGN.md wants editorial asymmetry; also AI-slop
+  pattern #4); (b) emoji as hero iconography (`✦ 🜂 ↗`) vs the "consistent custom line set"
+  the brief asks for.
+- **Effort:** S each. Needs a taste call before building.
 
