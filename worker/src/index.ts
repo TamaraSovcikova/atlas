@@ -456,6 +456,18 @@ async function callGroq(apiKey: string, prompt: string, system: string): Promise
 
 const MAX_CONCEPT_BYTES = 64 * 1024
 
+/** Keep a value only if it is a plain http(s) URL; strips javascript:/data:/etc. */
+function safeHttpUrl(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const trimmed = v.trim()
+  try {
+    const u = new URL(trimmed)
+    return u.protocol === 'https:' || u.protocol === 'http:' ? trimmed : null
+  } catch {
+    return null
+  }
+}
+
 async function handleConcepts(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url)
 
@@ -476,6 +488,12 @@ async function handleConcepts(req: Request, env: Env): Promise<Response> {
   }
 
   if (req.method === 'POST') {
+    // Writes to the shared bank require a bearer token (same gate as /sync), so a
+    // stranger cannot anonymously spam concepts into every user's feed with a bare
+    // curl. The token is the account; presence is the bar here.
+    const token = bearer(req)
+    if (!token) return json({ error: 'authentication required' }, 401)
+
     const text = await req.text()
     if (text.length > MAX_CONCEPT_BYTES) return json({ error: 'concept too large' }, 413)
     let body: { concept?: Record<string, unknown> }
@@ -488,6 +506,10 @@ async function handleConcepts(req: Request, env: Env): Promise<Response> {
     if (!id.startsWith('ai:') || name.length < 1 || summary.length < 1) {
       return json({ error: 'concept must have an ai: id, a name, and a summary' }, 400)
     }
+    // Strip non-http(s) URLs before storing so a javascript:/data: link can never be
+    // served back and rendered as a live href in every user's app.
+    c.wikipediaUrl = safeHttpUrl(c.wikipediaUrl)
+    c.imageUrl = safeHttpUrl(c.imageUrl)
     const nameKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '')
     const res = await env.DB.prepare(
       `INSERT INTO community_concepts (id, payload, name, name_key, created_at)

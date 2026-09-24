@@ -1,5 +1,6 @@
 import { db, type Concept, type Lesson, type RecallQuestion } from '../db/schema'
-import { SYNC_URL } from './sync'
+import { SYNC_URL, ensureAuthToken } from './sync'
+import { safeHttpUrl } from './url'
 import { newReview } from './fsrs'
 import { generateDeeperConcepts } from './ai'
 import type { KnowledgeLevel } from './settings'
@@ -191,8 +192,10 @@ export async function insertAiConcept(
     domain: VALID_DOMAINS.includes(c.domain) ? (c.domain as Concept['domain']) : 'history',
     lessonId,
     summary: c.summary,
-    wikipediaUrl: c.wikipediaUrl ?? null,
-    imageUrl: c.imageUrl ?? null,
+    // Only keep http(s) links; a javascript:/data: URL from an unauth community
+    // payload would otherwise become a live href when the card renders.
+    wikipediaUrl: safeHttpUrl(c.wikipediaUrl),
+    imageUrl: safeHttpUrl(c.imageUrl),
     approxYear: c.approxYear ?? null,
     eras: c.eras ?? [],
     threads: c.threads ?? [],
@@ -217,10 +220,11 @@ export async function insertAiConcept(
  */
 export async function contributeConcept(concept: RawConcept, level: KnowledgeLevel = 'some'): Promise<void> {
   try {
+    const token = await ensureAuthToken()
     const payload = { ...concept, id: variantId(baseId(concept.id), level) }
     await fetch(`${SYNC_URL}/concepts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ concept: payload }),
     })
   } catch {

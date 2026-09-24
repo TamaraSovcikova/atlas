@@ -45,6 +45,17 @@ export async function ensureSyncToken(): Promise<string> {
   return token
 }
 
+/**
+ * The bearer token to send on authenticated writes: the Google session if signed
+ * in, otherwise an anonymous token (minted if this device has none). Contributions
+ * to the shared bank require a token, so this guarantees one exists.
+ */
+export async function ensureAuthToken(): Promise<string> {
+  const session = (await db.settings.get(SESSION_KEY))?.value as string | undefined
+  if (session) return session
+  return ensureSyncToken()
+}
+
 export async function getLastSyncedAt(): Promise<number | null> {
   const row = await db.settings.get(LAST_KEY)
   return (row?.value as number | undefined) ?? null

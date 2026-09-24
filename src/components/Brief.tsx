@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Concept } from '../db/schema'
+import { safeHttpUrl } from '../lib/url'
 import { LinkedText } from './LinkedText'
 
 interface Props {
@@ -61,9 +62,9 @@ export function Brief({ concept, variant = 'intro', onConceptClick }: Props) {
           concept.summary
         )}
       </p>
-      {concept.wikipediaUrl && !isStimulus && (
+      {safeHttpUrl(concept.wikipediaUrl) && !isStimulus && (
         <a
-          href={concept.wikipediaUrl}
+          href={safeHttpUrl(concept.wikipediaUrl)!}
           target="_blank"
           rel="noreferrer"
           className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-ink/[0.10] bg-bg-soft px-3 py-1 text-[11px] text-ink-softer transition-colors hover:border-accent/40 hover:text-ink"

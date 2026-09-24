@@ -1,5 +1,6 @@
 import { db, type RecallQuestion, type RelationType } from '../db/schema'
 import { SYNC_URL } from './sync'
+import { safeHttpUrl } from './url'
 import type { KnowledgeLevel } from './settings'
 
 /**
@@ -301,7 +302,7 @@ ${RECALL_SCHEMA_HINT}
         threads: [],
         lat: typeof parsed.lat === 'number' ? parsed.lat : null,
         lng: typeof parsed.lng === 'number' ? parsed.lng : null,
-        wikipediaUrl: typeof parsed.wikipediaUrl === 'string' ? parsed.wikipediaUrl : null,
+        wikipediaUrl: safeHttpUrl(parsed.wikipediaUrl),
         imageUrl: null,
         complexity: clampComplexity(parsed.difficulty),
         recallQuestions: parseRecallQuestions(parsed.recall),
@@ -392,7 +393,7 @@ ${RECALL_SCHEMA_HINT}
         domain: VALID_DOMAINS.includes(c.domain as string) ? (c.domain as string) : 'history',
         summary,
         approxYear: typeof c.approxYear === 'number' ? c.approxYear : null,
-        wikipediaUrl: typeof c.wikipediaUrl === 'string' ? c.wikipediaUrl : null,
+        wikipediaUrl: safeHttpUrl(c.wikipediaUrl),
         relation: DEEP_RELATIONS.includes(c.relation as RelationType) ? (c.relation as RelationType) : 'part_of',
         complexity: clampComplexity(c.difficulty),
         recallQuestions: parseRecallQuestions(c.recall),
