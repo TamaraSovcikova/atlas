@@ -1,9 +1,9 @@
 import type { Domain, RelationType } from '../db/schema'
 
 /**
- * The shared content bank. Authored once (by Claude Code on the Max plan,
- * grounded in Wikipedia), committed here, and fetched identically by every
- * user. No per-user generation, no runtime AI, no recurring cost.
+ * The shared content bank. Authored once (grounded in Wikipedia), committed
+ * here, and fetched identically by every user. No per-user generation, no
+ * runtime AI, no recurring cost.
  *
  * These are plain typed data modules so `tsc` validates them at build time
  * and the index validator can check cross-references. A later migration can

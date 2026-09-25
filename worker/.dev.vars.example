@@ -1,0 +1,17 @@
+# Worker secrets — all optional; the app degrades gracefully without each.
+# Local dev:  copy this file to `worker/.dev.vars` and fill in, then `wrangler dev`.
+# Production: set each with `npx wrangler secret put <NAME>` from `worker/`.
+# (worker/.dev.vars is gitignored so real values never get committed.)
+
+# Pooled AI generation (primary). Without it, /ai returns 503 and the UI offers BYOK.
+GEMINI_API_KEY=
+
+# AI cascade fallback when Gemini is unavailable.
+GROQ_API_KEY=
+
+# Google sign-in (optional). Without these, anonymous token sync still works.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Global daily cap on pooled AI calls (defaults to 500 if unset).
+AI_DAILY_CAP=500

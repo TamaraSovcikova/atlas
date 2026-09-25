@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+.dev.vars
+worker/.dev.vars
 *_PRIVATE.md
 *credentials*
 
@@ -29,7 +31,7 @@ dev-dist/
 *.swp
 *.swo
 
-# Per-machine Claude config (launch.json etc.)
+# Per-machine editor/agent config
 .claude/
 
 # Logs
