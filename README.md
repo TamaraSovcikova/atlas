@@ -6,6 +6,14 @@ Atlas is for one user (initially) who wants to feel broadly caught-up on history
 
 Live: **https://atlas-6uj.pages.dev**
 
+## Screenshots
+
+| Daily feed | The Atlas of You (map) | River-of-time timeline |
+|---|---|---|
+| ![Daily feed](docs/screenshots/03-feed.png) | ![Fog-of-war era map](docs/screenshots/04-map.png) | ![River-of-time timeline](docs/screenshots/05-timeline.png) |
+
+<sub>A concept in the daily feed (read once, then it comes back as a spaced review) · the fog-of-war map where eras chart in as you learn · the river-of-time timeline. [Onboarding](docs/screenshots/01-onboarding.png) sets your knowledge level and interests so the feed starts at the right depth.</sub>
+
 ## Stack
 
 - React + Vite + TypeScript + Tailwind
@@ -78,6 +86,3 @@ declared in the Env type but unused: session tokens are random ids in the D1
 - Claude Code session orientation: `CLAUDE.md`
 - Design brief / art direction: `DESIGN.md`
 - Deferred work with context: `TODOS.md`
-- Narrative docs (PURPOSE, ARCHITECTURE, EVOLUTION, INTERVIEW, MISTAKES):
-  `~/workspace/Projects/Atlas/docs/` — the `~/workspace` symlink only resolves
-  inside WSL.
